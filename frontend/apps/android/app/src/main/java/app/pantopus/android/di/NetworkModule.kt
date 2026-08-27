@@ -105,6 +105,7 @@ import app.pantopus.android.data.api.services.TenantApi
 import app.pantopus.android.data.api.services.TokenAcceptApi
 import app.pantopus.android.data.api.services.TransactionReviewsApi
 import app.pantopus.android.data.api.services.UniversalSearchApi
+import app.pantopus.android.data.api.services.UnlistedApi
 import app.pantopus.android.data.api.services.UploadApi
 import app.pantopus.android.data.api.services.UserReportsApi
 import app.pantopus.android.data.api.services.UserSocialApi
@@ -597,6 +598,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideBlockFoundersApi(retrofit: Retrofit): BlockFoundersApi = retrofit.create(BlockFoundersApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideUnlistedApi(retrofit: Retrofit): UnlistedApi = retrofit.create(UnlistedApi::class.java)
 
     @Provides
     @Singleton

@@ -8,6 +8,7 @@ import app.pantopus.android.data.api.models.place.BlockInviteResult
 import app.pantopus.android.data.api.models.place.BlockStatusResponse
 import app.pantopus.android.data.api.models.place.FridgeCardResponse
 import app.pantopus.android.data.api.models.place.FridgeCardsResponse
+import app.pantopus.android.data.api.models.place.HomeUnlistedResponse
 import app.pantopus.android.data.api.models.place.IssueFridgeCardRequest
 import app.pantopus.android.data.api.models.place.IssueResidencyClaimRequest
 import app.pantopus.android.data.api.models.place.IssueResidencyLetterRequest
@@ -18,6 +19,7 @@ import app.pantopus.android.data.api.models.place.NeighborhoodPulse
 import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.models.place.PlacePreview
 import app.pantopus.android.data.api.models.place.PlaceSectionId
+import app.pantopus.android.data.api.models.place.PublicUnlistedResponse
 import app.pantopus.android.data.api.models.place.ReceivedNeighborMessage
 import app.pantopus.android.data.api.models.place.ReceivedNeighborMessagesResponse
 import app.pantopus.android.data.api.models.place.RecordWatchResponse
@@ -35,6 +37,9 @@ import app.pantopus.android.data.api.models.place.SendNeighborMessageRequest
 import app.pantopus.android.data.api.models.place.SentNeighborMessage
 import app.pantopus.android.data.api.models.place.SetRecordWatchRequest
 import app.pantopus.android.data.api.models.place.SetRentReportRequest
+import app.pantopus.android.data.api.models.place.SetUnlistedRemovalRequest
+import app.pantopus.android.data.api.models.place.UnlistedRemovalResponse
+import app.pantopus.android.data.api.models.place.UnlistedRemovalStatus
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.AIApi
@@ -49,6 +54,7 @@ import app.pantopus.android.data.api.services.RealRentApi
 import app.pantopus.android.data.api.services.RecordWatchApi
 import app.pantopus.android.data.api.services.ResidencyClaimsApi
 import app.pantopus.android.data.api.services.ResidencyLettersApi
+import app.pantopus.android.data.api.services.UnlistedApi
 import okhttp3.ResponseBody
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -75,6 +81,7 @@ class PlaceRepository
         private val recordWatchApi: RecordWatchApi,
         private val realRentApi: RealRentApi,
         private val blockFoundersApi: BlockFoundersApi,
+        private val unlistedApi: UnlistedApi,
         private val aiApi: AIApi,
         private val geoApi: GeoApi,
         private val homesApi: HomesApi,
@@ -249,4 +256,33 @@ class PlaceRepository
             homeId: String,
             recipient: BlockInviteRecipient,
         ): NetworkResult<BlockInviteResult> = safeApiCall { blockFoundersApi.invite(homeId, BlockInviteRequest(recipient)) }
+
+        // ── Unlisted — the state escape hatch + removal paths (T1+) ─
+        // We never query the broker sites: a lookup would disclose the
+        // address to the very companies the caller is leaving. Nothing
+        // here asks, or answers, whether someone IS listed.
+
+        /**
+         * The state profile plus the CALLER's own progress. Gated on
+         * home access, not verification. `unlisted.removals` is null
+         * when the progress read failed — distinct from the empty list.
+         */
+        suspend fun unlisted(homeId: String): NetworkResult<HomeUnlistedResponse> = safeApiCall { unlistedApi.forHome(homeId) }
+
+        /** The anonymous, address-only profile. Persists nothing. */
+        suspend fun publicUnlisted(address: String): NetworkResult<PublicUnlistedResponse> =
+            safeApiCall { unlistedApi.publicUnlisted(address) }
+
+        /**
+         * Record a step. [status] must be sendable — UNKNOWN is a decode
+         * fallback, never a value the server accepts (`BAD_STATUS`).
+         */
+        suspend fun setUnlistedRemoval(
+            homeId: String,
+            brokerId: String,
+            status: UnlistedRemovalStatus,
+        ): NetworkResult<UnlistedRemovalResponse> =
+            safeApiCall {
+                unlistedApi.setRemoval(homeId, brokerId, SetUnlistedRemovalRequest(status.wire))
+            }
     }

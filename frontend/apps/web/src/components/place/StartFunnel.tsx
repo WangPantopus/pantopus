@@ -35,7 +35,7 @@ import {
   House,
 } from 'lucide-react';
 import * as api from '@pantopus/api';
-import type { PlacePreview, PlacePreviewLockedSection } from '@pantopus/api';
+import type { PlacePreview, PlacePreviewLockedSection, PlacePreviewMoneyLead } from '@pantopus/api';
 import { Group, SectionCard, LockedCard, DensityCard, PlaceHeader, TextButton } from '@/components/archetypes/place';
 import { ShimmerBlock } from '@/components/ui/Shimmer';
 import { getStoreDownloadCta } from '@/lib/publicShare';
@@ -167,6 +167,47 @@ function PreviewHeroCard() {
             Create an account to save this place and keep it updated every day.
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── The money lead — the preview's headline figure (Wave 4) ──
+//
+// A real, free, public benchmark for the AREA: an NFIP tract premium
+// band or a HUD county fair market rent. The server composes the
+// sentence AND the figure — nothing here is computed or rounded client
+// side, because a dollar figure is the most believable thing on the page
+// and the easiest to overclaim.
+//
+// `money_lead: null` means no figure was genuinely available. The tiles
+// then carry the page exactly as they did before this existed: no
+// placeholder, no gap, no invented number.
+function MoneyLeadCard({ lead }: { lead: PlacePreviewMoneyLead }) {
+  return (
+    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-app-text-secondary">Public preview</span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-app-home-bg text-app-home text-[11px] font-semibold px-2 py-0.5">
+          <ShieldCheck size={12} strokeWidth={2.25} />
+          Free · one-time look
+        </span>
+      </div>
+      <div className="flex items-start gap-3">
+        <span className="inline-flex items-center justify-center shrink-0 w-[42px] h-[42px] rounded-xl bg-app-home-bg text-app-home">
+          {lead.kind === 'flood_premium'
+            ? <Waves size={22} strokeWidth={2} />
+            : <House size={22} strokeWidth={2} />}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[20px] font-bold text-app-text leading-[26px] -tracking-[0.018em]">{lead.headline}</p>
+          <p className="text-[13.5px] text-app-text-secondary leading-[19px] mt-1.5">{lead.detail}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap mt-3 pt-3 border-t border-app-border-subtle text-[12px] text-app-text-muted">
+        <span className="font-medium">{lead.source}</span>
+        <span className="opacity-50">·</span>
+        <span>{lead.scope}-level, not this home</span>
       </div>
     </div>
   );
@@ -425,7 +466,12 @@ export default function StartFunnel() {
                 }
               />
               <div className="mt-4">
-                <PreviewHeroCard />
+                {/* The dollar figure leads when there is a real one;
+                    otherwise the original hero carries the page exactly
+                    as before — never a placeholder in its place. */}
+                {preview.money_lead
+                  ? <MoneyLeadCard lead={preview.money_lead} />
+                  : <PreviewHeroCard />}
               </div>
               <PreviewBody preview={preview} onWall={goWall} />
               <div className="h-4" />

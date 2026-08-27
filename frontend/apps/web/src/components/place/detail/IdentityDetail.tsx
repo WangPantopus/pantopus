@@ -16,15 +16,22 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '@pantopus/api';
-import type { ResidencyLetter, ResidencyClaim, ResidencyClaimScope, ResidencyClaimExpiryDays, MailboxCheck, MailboxFindingSeverity } from '@pantopus/api';
+import type { ResidencyLetter, ResidencyClaim, ResidencyClaimScope, ResidencyClaimExpiryDays, MailboxCheck, MailboxFindingSeverity, UnlistedRemovalStatus } from '@pantopus/api';
 import { RESIDENCY_CLAIM_EXPIRY_DAYS } from '@pantopus/api';
 import type { PlaceIntelligence } from '@pantopus/types';
-import { BadgeCheck, Check, FileText, ScanFace, Mailbox, Download, ChevronRight, LayoutDashboard, ShieldCheck, Ban, Loader2, Fingerprint, Copy, Eye, Clock, MailCheck, TriangleAlert, Info, CircleCheck, CircleX } from 'lucide-react';
+import { BadgeCheck, Check, FileText, ScanFace, Mailbox, Download, ChevronRight, LayoutDashboard, ShieldCheck, Ban, Loader2, Fingerprint, Copy, Eye, Clock, MailCheck, TriangleAlert, Info, CircleCheck, CircleX, EyeOff } from 'lucide-react';
 import Chip from '@/components/archetypes/primitives/Chip';
 import { LockedCard, DetailHeader, DetailSectionLabel, SourceNote, InfoNote } from '@/components/archetypes/place';
 import { toast } from '@/components/ui/toast-store';
 import { queryKeys } from '@/lib/query-keys';
 import { detailAddress } from './sections';
+import {
+  StateProgramSection,
+  MethodNote,
+  BrokerGroups,
+  WeDoNotRemoveNote,
+  fmtDay,
+} from '@/components/place/unlisted/parts';
 
 function issueDate(): string {
   return new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -596,10 +603,147 @@ function ResidencyPassLeaf({ homeId, address, onBack }: { homeId: string; addres
   );
 }
 
+// ── Unlisted — your address, and how to take it back ─────────
+//
+// The claimed-home half of /unlisted. Same three rules as the public
+// page: the state's confidentiality program leads, `method_note` is
+// rendered verbatim (we do NOT query these sites — searching them would
+// hand them the address), and each broker's caveat travels whole.
+//
+// What the claimed home adds is bookkeeping the resident owns: which
+// sites they have written to. Pantopus never submits an opt-out for
+// anyone — the removal happens on the broker's own form, and we record
+// only what the person tells us.
+//
+// Gate: home access, NOT verification. Someone who has just claimed
+// their address is exactly who needs this.
+
+function UnlistedLeaf({ homeId, address, onBack }: { homeId: string; address: string; onBack: () => void }) {
+  const queryClient = useQueryClient();
+  const [busyBrokerId, setBusyBrokerId] = useState<string | null>(null);
+
+  const unlistedQuery = useQuery({
+    queryKey: queryKeys.unlisted(homeId),
+    queryFn: () => api.unlisted.getHomeUnlisted(homeId),
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ brokerId, status }: { brokerId: string; status: UnlistedRemovalStatus }) =>
+      api.unlisted.setRemovalStatus(homeId, brokerId, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.unlisted(homeId) });
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not save your progress.'),
+    onSettled: () => setBusyBrokerId(null),
+  });
+
+  const profile = unlistedQuery.data;
+  const removals = profile?.removals ?? null;
+  // NULL means the read FAILED — distinct from [] ("nothing done yet").
+  // An empty checklist is a confident claim we cannot make when we could
+  // not read the rows, so the progress UI is withheld and said so.
+  const removalsFailed = !!profile && profile.removals === null;
+  const statusByBroker = new Map<string, UnlistedRemovalStatus>(
+    (removals ?? []).map((r) => [r.broker_id, r.status]),
+  );
+  const confirmedCount = (removals ?? []).filter((r) => r.status === 'confirmed').length;
+
+  return (
+    <>
+      <DetailHeader title="Unlisted" address={address} onBack={onBack} />
+      <div className="px-4 sm:px-5 pt-1 pb-16">
+        {unlistedQuery.isLoading ? (
+          <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 mt-4 text-[13.5px] text-app-text-muted">
+            Loading your removal list…
+          </div>
+        ) : !profile ? (
+          <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 mt-4">
+            <div className="text-[15px] font-semibold text-app-text">Couldn&apos;t load your removal list</div>
+            <p className="text-[13px] text-app-text-secondary leading-[19px] mt-1">Check your connection and try again.</p>
+            <button
+              type="button"
+              onClick={() => unlistedQuery.refetch()}
+              className="mt-3 h-10 px-4 rounded-[10px] border-[1.5px] border-app-border bg-app-surface text-app-text text-[13.5px] font-semibold hover:bg-app-hover transition"
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* 1. The escape hatch, above the list, always. */}
+            <DetailSectionLabel>Your state&apos;s program</DetailSectionLabel>
+            <StateProgramSection profile={profile} />
+
+            {/* 2. The honesty line, verbatim, beside the list it is about. */}
+            {/* Names the SITES, not the person: "where your address gets
+                republished" would assert a listing we never checked for. */}
+            <DetailSectionLabel>Sites that republish county records</DetailSectionLabel>
+            <MethodNote note={profile.method_note} />
+
+            {/* 3. This resident's own progress — or an honest gap. */}
+            {removalsFailed ? (
+              <div className="flex items-start gap-2.5 mt-3 px-3.5 py-3 rounded-xl border border-app-warning-light bg-app-warning-bg">
+                <TriangleAlert size={16} strokeWidth={2.25} className="mt-0.5 shrink-0 text-app-warning" />
+                <div>
+                  <div className="text-[13.5px] font-semibold text-app-text-strong">
+                    We couldn&apos;t read your progress just now
+                  </div>
+                  <p className="text-[12.5px] text-app-text-strong leading-[18px] mt-0.5">
+                    So we are not showing a checklist — an empty one would say you have done nothing, and we do not
+                    know that. Your saved progress is untouched.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => unlistedQuery.refetch()}
+                    className="mt-2 h-9 px-3.5 rounded-[10px] border-[1.5px] border-app-border bg-app-surface text-app-text text-[13px] font-semibold hover:bg-app-hover transition"
+                  >
+                    Try again
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 text-[13px] text-app-text-secondary px-1">
+                {confirmedCount === 0
+                  ? `${profile.broker_count} ${profile.broker_count === 1 ? 'site' : 'sites'} to work through. Mark each one as you go.`
+                  : `${confirmedCount} of ${profile.broker_count} confirmed removed.`}
+              </div>
+            )}
+
+            <BrokerGroups
+              profile={profile}
+              // Withheld entirely when the read failed: no status chips,
+              // no buttons, rather than a checklist of zeros.
+              statusFor={removalsFailed ? undefined : (id) => statusByBroker.get(id) ?? 'todo'}
+              onStatus={
+                removalsFailed
+                  ? undefined
+                  : (brokerId, status) => {
+                      setBusyBrokerId(brokerId);
+                      statusMutation.mutate({ brokerId, status });
+                    }
+              }
+              busyBrokerId={busyBrokerId}
+            />
+
+            {profile.registry_verified_at ? (
+              <p className="text-[12px] text-app-text-muted mt-4 px-1">
+                Links last checked {fmtDay(profile.registry_verified_at)}.
+              </p>
+            ) : null}
+
+            <WeDoNotRemoveNote />
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
 export default function IdentityDetail({ intelligence, homeId, residentName }: { intelligence: PlaceIntelligence; homeId: string | null; residentName: string }) {
   const router = useRouter();
   const [letterOpen, setLetterOpen] = useState(false);
   const [claimsOpen, setClaimsOpen] = useState(false);
+  const [unlistedOpen, setUnlistedOpen] = useState(false);
   const verified = intelligence.tier === 'T4';
   const address = detailAddress(intelligence.place);
   const place = intelligence.place;
@@ -624,6 +768,11 @@ export default function IdentityDetail({ intelligence, homeId, residentName }: {
         onBack={() => setClaimsOpen(false)}
       />
     );
+  }
+
+  // Home access only — verification is deliberately NOT required here.
+  if (unlistedOpen && homeId) {
+    return <UnlistedLeaf homeId={homeId} address={address} onBack={() => setUnlistedOpen(false)} />;
   }
 
   return (
@@ -686,6 +835,27 @@ export default function IdentityDetail({ intelligence, homeId, residentName }: {
 
         {homeId && (
           <>
+            <DetailSectionLabel>Your address online</DetailSectionLabel>
+            <button
+              type="button"
+              onClick={() => setUnlistedOpen(true)}
+              className="w-full flex items-center gap-3.5 bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 text-left hover:bg-app-hover transition"
+            >
+              <span className="w-11 h-11 rounded-xl bg-primary-100 flex items-center justify-center shrink-0">
+                <EyeOff size={22} strokeWidth={2} className="text-primary-600" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em]">Unlisted — take your address back</div>
+                <div className="text-[12.5px] text-app-text-muted mt-0.5">Your state&apos;s confidentiality program, then the opt-out path for every site that republishes county records</div>
+              </div>
+              <ChevronRight size={18} strokeWidth={2.25} className="shrink-0 text-app-text-muted" />
+            </button>
+            <InfoNote>
+              We never look your address up on people-search sites — searching them would hand them your address.
+              This is the list of sites that republish county records and how to leave each, plus a place to track
+              what you have sent.
+            </InfoNote>
+
             <DetailSectionLabel>Mailbox</DetailSectionLabel>
             <MailboxCheckCard homeId={homeId} />
             <InfoNote>

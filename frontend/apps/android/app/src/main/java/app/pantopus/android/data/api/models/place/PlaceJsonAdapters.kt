@@ -242,6 +242,16 @@ object PlaceEnumAdapterFactory : JsonAdapter.Factory {
             PlacePreviewStatus::class.java to PlacePreviewStatus.UNKNOWN,
             PlacePreviewSectionStatus::class.java to PlacePreviewSectionStatus.UNAVAILABLE,
             PlacePreviewUnlock::class.java to PlacePreviewUnlock.UNKNOWN,
+            MoneyLeadKind::class.java to MoneyLeadKind.UNKNOWN,
+            // Unlisted (Wave 4). Every one of these is on the path of
+            // someone trying to get their home address off the internet:
+            // an unrecognized value must degrade to UNKNOWN — which the
+            // UI renders as "not stated" — rather than throwing and
+            // taking the whole removal list, the state program, and the
+            // method note down with it.
+            UnlistedRemovalMethod::class.java to UnlistedRemovalMethod.UNKNOWN,
+            UnlistedRemovalStatus::class.java to UnlistedRemovalStatus.UNKNOWN,
+            UnlistedPreviewStatus::class.java to UnlistedPreviewStatus.UNKNOWN,
         )
 
     override fun create(

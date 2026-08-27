@@ -395,18 +395,28 @@ async function fetchMoneyLeadCached(lat, lng, tractHint) {
       // Flood cost first: it is the most specific to the address (a
       // census tract, not a county) and the most surprising.
       if (nfip && nfip.status === 'ready' && nfip.data && nfip.data.premium_p25 && nfip.data.premium_p75) {
+        // WHOLE DOLLARS. The NFIP quantile returns a raw premium straight
+        // from OpenFEMA, which carries cents — so this could be 1243.5.
+        // Two reasons that must not escape: a headline reading
+        // "$1,243.5 a year" is simply wrong typography, and both native
+        // clients type money_lead.low/high as Int, so a fractional value
+        // fails the decode and takes the ENTIRE preview down with it.
+        // (The flood section's own premium fields are Double on both
+        // platforms and are unaffected.)
+        const low = Math.round(nfip.data.premium_p25);
+        const high = Math.round(nfip.data.premium_p75);
         lead = {
           kind: 'flood_premium',
-          headline: `Flood policies near here run $${nfip.data.premium_p25.toLocaleString('en-US')}–$${nfip.data.premium_p75.toLocaleString('en-US')} a year`,
+          headline: `Flood policies near here run $${low.toLocaleString('en-US')}–$${high.toLocaleString('en-US')} a year`,
           detail: `Across ${nfip.data.policy_count} real NFIP policies in this census tract. A benchmark, not a quote.`,
-          low: nfip.data.premium_p25,
-          high: nfip.data.premium_p75,
+          low,
+          high,
           scope: 'census tract',
           source: 'FEMA · OpenFEMA NFIP policies',
         };
       } else if (fmr && Array.isArray(fmr.fmr_lo) && fmr.fmr_lo[2]) {
-        const lo = fmr.fmr_lo[2];
-        const hi = Math.max(fmr.fmr_hi[2] || 0, Math.round(lo * 1.2));
+        const lo = Math.round(fmr.fmr_lo[2]);
+        const hi = Math.round(Math.max(fmr.fmr_hi[2] || 0, lo * 1.2));
         lead = {
           kind: 'rent_band',
           headline: `A 2-bedroom here rents for about $${lo.toLocaleString('en-US')}–$${hi.toLocaleString('en-US')} a month`,

@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.place.PlaceGroup
+import app.pantopus.android.data.api.models.place.PlaceMoneyLead
 import app.pantopus.android.data.api.models.place.PlacePreview
 import app.pantopus.android.data.api.models.place.PlacePreviewLockedSection
 import app.pantopus.android.data.api.models.place.PlacePreviewSectionStatus
@@ -47,6 +48,7 @@ import app.pantopus.android.ui.screens.place.components.placeCard
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Spacing
 
 @Composable
 fun PlaceLaunchScreen(
@@ -296,6 +298,10 @@ private fun PreviewBody(
                         color = PantopusColors.appText,
                     )
                 }
+                // A real dollar band when one exists for this address,
+                // and nothing at all when it does not — the tiles carry
+                // the page as before. Never synthesized client-side.
+                preview.moneyLead?.takeIf { it.isRenderable }?.let { MoneyLeadCard(it) }
                 preview.free?.let { free ->
                     PlaceGroupLabel(text = "Risk & readiness", modifier = Modifier.padding(top = 18.dp))
                     PlaceSectionCard(
@@ -349,6 +355,38 @@ private fun PreviewBody(
             )
             PrimaryButton(title = "Create account", onClick = onCreateAccount, modifier = Modifier.fillMaxWidth())
         }
+    }
+}
+
+/**
+ * The preview's lead figure (Wave 4). Present only when the backend
+ * had a real benchmark — a census-tract NFIP premium band or a county
+ * HUD fair-market rent — and it carries the scope it is true at so the
+ * reader is not sold a county estimate as their own bill.
+ */
+@Composable
+private fun MoneyLeadCard(lead: PlaceMoneyLead) {
+    Column(
+        modifier = Modifier.fillMaxWidth().placeCard().padding(Spacing.s4).padding(top = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(34.dp).clip(RoundedCornerShape(9.dp)).background(PantopusColors.homeBg),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(PantopusIcon.DollarSign, null, size = 19.dp, strokeWidth = 2f, tint = PantopusColors.home)
+            }
+            Text(
+                lead.headline,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 20.sp,
+                color = PantopusColors.appText,
+            )
+        }
+        Text(lead.detail, fontSize = 13.sp, lineHeight = 18.sp, color = PantopusColors.appTextSecondary)
+        Text(lead.source, fontSize = 11.5.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appTextMuted)
     }
 }
 

@@ -280,6 +280,7 @@ export type {
   PlacePreviewDensity,
   PlacePreviewArea,
   PlacePreviewLockedSection,
+  PlacePreviewMoneyLead,
 } from './endpoints/place';
 
 // Place — server-attested residency letters (Phase 1, #11)
@@ -337,6 +338,21 @@ export type { BlockStatus, BlockMeter, BlockInviteRecipient, BlockInviteResult }
 // Place — the Real Rent Benchmark, resident contribution half (Wave 3)
 export * as realRent from './endpoints/realRent';
 export type { RentReport } from './endpoints/realRent';
+
+// Place — Unlisted: the address-removal surface (Wave 4)
+export * as unlisted from './endpoints/unlisted';
+export { UNLISTED_REMOVAL_STATUSES } from './endpoints/unlisted';
+export type {
+  UnlistedProfile,
+  UnlistedHomeProfile,
+  UnlistedStateProgram,
+  UnlistedBroker,
+  UnlistedBrokerGroup,
+  UnlistedRemoval,
+  UnlistedRemovalStatus,
+  UnlistedRemovalMethod,
+  PublicUnlisted,
+} from './endpoints/unlisted';
 
 // Place — verified-only neighbor messaging (W2.6)
 export * as neighborMessages from './endpoints/neighborMessages';

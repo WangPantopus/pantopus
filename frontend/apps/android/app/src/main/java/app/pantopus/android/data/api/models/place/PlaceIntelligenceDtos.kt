@@ -1261,6 +1261,45 @@ data class PlacePreviewFree(
     val area: PlacePreviewArea,
 )
 
+/** Which real figure the preview's money lead is built from. */
+enum class MoneyLeadKind {
+    @Json(name = "flood_premium")
+    FLOOD_PREMIUM,
+
+    @Json(name = "rent_band")
+    RENT_BAND,
+
+    UNKNOWN,
+}
+
+/**
+ * The preview's lead figure (Wave 4) — a real dollar band from FEMA's
+ * NFIP policies or HUD's fair market rents, with the scope it is true
+ * at. `money_lead` is null when no figure was available; the tiles then
+ * carry the page exactly as before. NEVER synthesize a figure
+ * client-side: the whole point is that this one is real.
+ */
+@JsonClass(generateAdapter = true)
+data class PlaceMoneyLead(
+    val kind: MoneyLeadKind = MoneyLeadKind.UNKNOWN,
+    val headline: String = "",
+    val detail: String = "",
+    val low: Int = 0,
+    val high: Int = 0,
+    /** "census tract" or "county" — how specific the figure actually is. */
+    val scope: String = "",
+    val source: String = "",
+) {
+    /**
+     * The server writes the sentence; the client only decides whether
+     * there is one to show. An empty headline is nothing to lead with —
+     * and a required field here would take the WHOLE anonymous preview
+     * down over the one section that is meant to be optional. Parity
+     * twin of the iOS `PlaceMoneyLead.isRenderable`.
+     */
+    val isRenderable: Boolean get() = headline.isNotEmpty()
+}
+
 /**
  * `GET /api/public/place?address=` — the anonymous, address-only
  * preview. Non-persistent (no DB writes): close and reopen still hits
@@ -1276,6 +1315,9 @@ data class PlacePreview(
     /** Present on UNSUPPORTED_REGION. */
     val message: String? = null,
     val place: PlacePreviewPlaceRef? = null,
+    /** Null ⇒ no figure was available. Fall back to the tiles; never
+     * invent one. */
+    @Json(name = "money_lead") val moneyLead: PlaceMoneyLead? = null,
     val free: PlacePreviewFree? = null,
     val locked: List<PlacePreviewLockedSection>? = null,
     val disclaimer: String? = null,

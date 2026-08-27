@@ -9,6 +9,8 @@ import app.pantopus.android.data.api.models.place.IssueFridgeCardRequest
 import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.models.place.PlaceSectionEnvelope
 import app.pantopus.android.data.api.models.place.PlaceSectionId
+import app.pantopus.android.data.api.models.place.UnlistedProfile
+import app.pantopus.android.data.api.models.place.UnlistedRemovalStatus
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
@@ -522,7 +524,86 @@ class PlaceDetailViewModel
             }
         }
 
+        // ── Unlisted — address removal (Identity detail, T1+) ────
+        // NOT gated on verification: someone who has just claimed their
+        // address is exactly who needs this, and making them wait for a
+        // postcard to start removing themselves would invert it.
+
+        private val _unlisted = MutableStateFlow<UnlistedUiState>(UnlistedUiState.Loading)
+        val unlisted: StateFlow<UnlistedUiState> = _unlisted.asStateFlow()
+
+        /** The broker whose step is being written right now, if any. */
+        private val _pendingRemovalBrokerId = MutableStateFlow<String?>(null)
+        val pendingRemovalBrokerId: StateFlow<String?> = _pendingRemovalBrokerId.asStateFlow()
+
+        fun loadUnlisted() {
+            viewModelScope.launch {
+                _unlisted.value =
+                    when (val r = repo.unlisted(homeId)) {
+                        is NetworkResult.Success -> UnlistedUiState.Loaded(r.data.unlisted)
+                        is NetworkResult.Failure ->
+                            UnlistedUiState.Error(r.error.displayMessage("Couldn't load your removal list."))
+                    }
+            }
+        }
+
+        /**
+         * Record where the resident has got to with one broker.
+         *
+         * A failed write must NOT collapse the section: the state
+         * program, the method note and every opt-out link stay exactly
+         * where they were, and the failure is reported through the
+         * shared action toast, which this section renders inline. The
+         * alternative — an Error card in place of the list — takes a
+         * frightened person's removal instructions away over a transient
+         * 500.
+         *
+         * On success the confirmed row is merged in place rather than
+         * refetched, EXCEPT when the progress read had failed (removals
+         * null): merging into nothing would fabricate a complete
+         * checklist out of one row, so we re-read and stay honest about
+         * whatever comes back.
+         */
+        fun setUnlistedRemoval(
+            brokerId: String,
+            status: UnlistedRemovalStatus,
+        ) {
+            if (!status.isSendable || brokerId.isBlank()) return
+            viewModelScope.launch {
+                _pendingRemovalBrokerId.value = brokerId
+                when (val r = repo.setUnlistedRemoval(homeId, brokerId, status)) {
+                    is NetworkResult.Success -> {
+                        val current = _unlisted.value
+                        if (current is UnlistedUiState.Loaded && current.profile.removals != null) {
+                            _unlisted.value = UnlistedUiState.Loaded(current.profile.withRemoval(r.data.removal))
+                        } else {
+                            loadUnlisted()
+                        }
+                        _actionToast.value = PlaceActionToast(removalSavedMessage(status), isError = false)
+                    }
+                    is NetworkResult.Failure ->
+                        _actionToast.value =
+                            PlaceActionToast(r.error.displayMessage("Couldn't save that step."), isError = true)
+                }
+                _pendingRemovalBrokerId.value = null
+            }
+        }
+
         companion object {
+            /**
+             * We track what the resident tells us they have done — we do
+             * not do it for them, and the confirmation must not imply we
+             * did.
+             */
+            internal fun removalSavedMessage(status: UnlistedRemovalStatus): String =
+                when (status) {
+                    UnlistedRemovalStatus.TODO -> "Marked as still to do."
+                    UnlistedRemovalStatus.REQUESTED -> "Noted — you've sent the request."
+                    UnlistedRemovalStatus.CONFIRMED -> "Noted — you've confirmed the removal."
+                    UnlistedRemovalStatus.RELISTED -> "Noted — the site has put you back."
+                    UnlistedRemovalStatus.UNKNOWN -> "Saved."
+                }
+
             /** Whatever the viewer typed, refused in their own terms. */
             internal const val RENT_AMOUNT_MESSAGE = "Enter the amount you pay each month, like 2150."
 
@@ -678,6 +759,21 @@ sealed interface ResidencyLetterUiState {
     data class Loaded(val letters: List<app.pantopus.android.data.api.models.place.ResidencyLetter>) : ResidencyLetterUiState
 
     data class Error(val message: String) : ResidencyLetterUiState
+}
+
+/**
+ * Unlisted (Wave 4). There is no `None` case on purpose: the profile is
+ * the law and a verified registry, so it is never empty for a US state
+ * — and an unverified state arrives as a null `stateProgram` INSIDE a
+ * loaded profile, which the UI renders as "we could not confirm",
+ * never as "your state has none".
+ */
+sealed interface UnlistedUiState {
+    data object Loading : UnlistedUiState
+
+    data class Loaded(val profile: UnlistedProfile) : UnlistedUiState
+
+    data class Error(val message: String) : UnlistedUiState
 }
 
 sealed interface PlaceDetailUiState {

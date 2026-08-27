@@ -57,6 +57,15 @@ fun PlaceIdentityDetailContent(
     PlaceDetailSectionLabel("Verification")
     VerifiedStatusCard(isVerified, placeDetailAddress(intel.place))
 
+    // Unlisted sits directly under Verification and is NOT gated on
+    // T4: someone who has just claimed their address is exactly who
+    // needs it, and a page called "get my address off the internet"
+    // that waits on a postcard inverts the product. It also outranks
+    // the letter and the pass for the reader most likely to be here.
+    PlaceDetailSectionLabel("Your address online")
+    LaunchedEffect(Unit) { viewModel.loadUnlisted() }
+    PlaceUnlistedSection(viewModel)
+
     PlaceDetailSectionLabel("Residency letter")
     if (isVerified) {
         LaunchedEffect(Unit) { viewModel.loadLetters() }

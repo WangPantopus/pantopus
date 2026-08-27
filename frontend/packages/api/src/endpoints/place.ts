@@ -54,6 +54,28 @@ export interface PlacePreviewArea {
   source: string;
 }
 
+/**
+ * The preview's headline dollar figure (Wave 4). A real, free, public
+ * benchmark for the AREA — an NFIP tract premium band or a HUD county
+ * fair market rent — never a quote, never "your home".
+ *
+ * `money_lead: null` means no figure was genuinely available. The tiles
+ * then carry the page exactly as they did before: NEVER synthesize a
+ * number client-side, and never leave a placeholder where one would be.
+ */
+export interface PlacePreviewMoneyLead {
+  kind: 'flood_premium' | 'rent_band';
+  /** Server-composed sentence with the figure already in it. */
+  headline: string;
+  /** What the figure is drawn from, and what it is not. */
+  detail: string;
+  low: number;
+  high: number;
+  /** The geography the figure describes, e.g. "census tract", "county". */
+  scope: string;
+  source: string;
+}
+
 /** A gated section descriptor — drives a LockedCard + the soft wall. */
 export interface PlacePreviewLockedSection {
   id: string;
@@ -78,6 +100,11 @@ export interface PlacePreview {
     state: string | null;
     zipcode: string | null;
   };
+  /**
+   * The lead figure, above the tiles. Null (or absent) when nothing
+   * real was available — fall back to the tiles, do not invent one.
+   */
+  money_lead?: PlacePreviewMoneyLead | null;
   /** The free demonstration subset (present on ready/partial). */
   free?: {
     flood: PlacePreviewFlood;

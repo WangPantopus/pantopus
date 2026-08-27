@@ -1600,6 +1600,57 @@ public struct PlacePreviewFree: Decodable, Sendable, Hashable {
 /// `GET /api/public/place?address=` — the anonymous, address-only
 /// preview. Non-persistent (no DB writes): close and reopen still hits
 /// the wall.
+/// Which real figure the preview's money lead is built from.
+public enum PlaceMoneyLeadKind: String, Sendable, Hashable {
+    case floodPremium = "flood_premium"
+    case rentBand = "rent_band"
+    case unknown
+}
+
+extension PlaceMoneyLeadKind: Decodable {
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = PlaceMoneyLeadKind(rawValue: raw) ?? .unknown
+    }
+}
+
+/// The preview's lead figure (Wave 4) — a real dollar band from FEMA's
+/// NFIP policies or HUD's fair market rents, carrying the SCOPE it is
+/// actually true at ("census tract", "county"), because a county
+/// estimate sold as this home's bill is the easiest overclaim on the
+/// page. `money_lead` is null when no figure was available, and the
+/// tiles then carry the preview exactly as before. NEVER synthesize one
+/// client-side: the whole point is that this figure is real.
+public struct PlaceMoneyLead: Decodable, Sendable, Hashable {
+    public let kind: PlaceMoneyLeadKind
+    public let headline: String
+    public let detail: String
+    public let low: Int
+    public let high: Int
+    /// "census tract" or "county" — how specific the figure really is.
+    public let scope: String
+    public let source: String
+
+    private enum CodingKeys: String, CodingKey {
+        case kind, headline, detail, low, high, scope, source
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try container.decodeIfPresent(PlaceMoneyLeadKind.self, forKey: .kind) ?? .unknown
+        headline = try container.decodeIfPresent(String.self, forKey: .headline) ?? ""
+        detail = try container.decodeIfPresent(String.self, forKey: .detail) ?? ""
+        low = try container.decodeIfPresent(Int.self, forKey: .low) ?? 0
+        high = try container.decodeIfPresent(Int.self, forKey: .high) ?? 0
+        scope = try container.decodeIfPresent(String.self, forKey: .scope) ?? ""
+        source = try container.decodeIfPresent(String.self, forKey: .source) ?? ""
+    }
+
+    /// The server writes the sentence; we only decide whether there is
+    /// one to show. An empty headline is nothing to lead with.
+    public var isRenderable: Bool { !headline.isEmpty }
+}
+
 public struct PlacePreview: Decodable, Sendable, Hashable {
     public let status: PlacePreviewStatus
     /// Always "preview".
@@ -1609,7 +1660,15 @@ public struct PlacePreview: Decodable, Sendable, Hashable {
     /// Present on `unsupportedRegion`.
     public let message: String?
     public let place: PlacePreviewPlaceRef?
+    /// nil ⇒ no figure was available. Fall back to the tiles; never
+    /// invent one.
+    public let moneyLead: PlaceMoneyLead?
     public let free: PlacePreviewFree?
     public let locked: [PlacePreviewLockedSection]?
     public let disclaimer: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case status, tier, region, message, place, free, locked, disclaimer
+        case moneyLead = "money_lead"
+    }
 }

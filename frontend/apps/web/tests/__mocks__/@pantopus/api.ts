@@ -8,6 +8,12 @@ export const identitySearch = {
   searchProfiles: jest.fn(),
 };
 
+// Public address typeahead (services/geo) — the signed-out funnel's input.
+export const geo = {
+  autocomplete: jest.fn(),
+  autocompleteWithAbort: jest.fn(),
+};
+
 // P1.6 — audience-profile surface mocks. Tests stub these via mockResolvedValue.
 export const personas = {
   getMyPersona: jest.fn(),
@@ -158,6 +164,13 @@ export const realRent = {
   setRentReport: jest.fn(),
   deleteRentReport: jest.fn(),
 };
+// Place — Unlisted: the address-removal surface (Wave 4).
+export const unlisted = {
+  getPublicUnlisted: jest.fn(),
+  getHomeUnlisted: jest.fn(),
+  setRemovalStatus: jest.fn(),
+};
+export const UNLISTED_REMOVAL_STATUSES = ['todo', 'requested', 'confirmed', 'relisted'] as const;
 // Place — mailbox reality check (Wave 1, #3).
 export const mailboxCheck = {
   getMailboxCheck: jest.fn(),

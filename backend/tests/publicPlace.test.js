@@ -397,3 +397,24 @@ describe('the money lead', () => {
     expect(res.body.free.density.bucket).toBeDefined();
   });
 });
+
+// Regression: the NFIP quantile returns a RAW OpenFEMA premium, which
+// carries cents. Both native clients type money_lead.low/high as Int, so
+// a fractional value fails the decode and takes the entire preview down.
+test('the money lead is always whole dollars, even from fractional premiums', async () => {
+  seedTable('PlaceSectionCache', [{
+    cache_key: 'tract:41051001902',
+    section_id: '_nfip_tract',
+    payload: { policy_count: 128, premium_p25: 480.5, premium_median: 760.25, premium_p75: 1243.75, window_months: 24, coverage: 'full' },
+    fetched_at: '2026-08-01T00:00:00.000Z',
+    expires_at: '2026-11-01T00:00:00.000Z',
+  }]);
+
+  const res = await request(buildApp()).get('/api/public/place').query({ address: '1421 SE Oak St' });
+  const lead = res.body.money_lead;
+  expect(Number.isInteger(lead.low)).toBe(true);
+  expect(Number.isInteger(lead.high)).toBe(true);
+  // And the headline must not print a stray decimal.
+  expect(lead.headline).not.toMatch(/\.\d/);
+  expect(lead.headline).toMatch(/\$481–\$1,244 a year/);
+});

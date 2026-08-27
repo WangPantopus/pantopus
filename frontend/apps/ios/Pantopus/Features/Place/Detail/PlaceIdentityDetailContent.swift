@@ -137,6 +137,7 @@ struct PlaceIdentityDetailContent: View {
     @State private var letters: PlaceResidencyLetterViewModel
     @State private var mailbox: PlaceMailboxCheckViewModel
     @State private var pass: PlaceResidencyPassViewModel
+    @State private var unlisted: PlaceUnlistedViewModel
 
     init(intel: PlaceIntelligence, vm: PlaceDetailViewModel) {
         self.intel = intel
@@ -144,6 +145,7 @@ struct PlaceIdentityDetailContent: View {
         _letters = State(initialValue: PlaceResidencyLetterViewModel(homeId: vm.homeId))
         _mailbox = State(initialValue: PlaceMailboxCheckViewModel(homeId: vm.homeId))
         _pass = State(initialValue: PlaceResidencyPassViewModel(homeId: vm.homeId))
+        _unlisted = State(initialValue: PlaceUnlistedViewModel(homeId: vm.homeId))
     }
 
     private var isVerified: Bool {
@@ -182,6 +184,14 @@ struct PlaceIdentityDetailContent: View {
                     onTap: nil
                 )
             }
+
+            // Unlisted is gated on ACCESS, not verification: someone who
+            // has just claimed their address is exactly who needs to start
+            // removing it, and making them wait for a postcard would
+            // invert the product.
+            PlaceDetailSectionLabel(text: "Get your address off the internet")
+            PlaceUnlistedSection(vm: unlisted)
+                .task { await unlisted.load() }
 
             PlaceDetailSectionLabel(text: "Mailbox")
             MailboxCheckSection(vm: mailbox)
