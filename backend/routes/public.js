@@ -10,6 +10,7 @@ const {
 } = require('../services/ai/neighborhoodProfileService');
 const { readThrough } = require('../services/placeSectionCache');
 const nfipPremiumService = require('../services/nfipPremiumService');
+const unlistedService = require('../services/unlistedService');
 const placeSectionAdapters = require('../services/placeSectionAdapters');
 const { encodeGeohash, encodeGeohash6 } = require('../utils/geohash');
 const { GeoCache } = require('../utils/geoCache');
@@ -550,6 +551,54 @@ router.get('/place', async (req, res) => {
 });
 
 // ============================================================
+// ── GET /api/public/unlisted?address=… (Wave 4) ─────────────
+//
+// "Type your address to get it off the internet", for someone with no
+// account. The inversion that makes it convert: you hand over an address
+// in order to make it LESS visible.
+//
+// It persists NOTHING. It resolves the address to a STATE and returns a
+// profile that is identical for everyone in that state — the law, and a
+// verified registry of removal paths. The address is never stored and
+// never sent to any third party. That last point is load-bearing:
+// looking someone up on a people-search site would disclose their
+// address to the exact company they are trying to leave, so we do not,
+// and the payload says so in `method_note`.
+router.get('/unlisted', async (req, res) => {
+  try {
+    const rawAddress = typeof req.query.address === 'string' ? req.query.address.trim() : '';
+    if (!rawAddress) {
+      return res.status(400).json({ error: 'An address query parameter is required.' });
+    }
+    if (rawAddress.length > 200) {
+      return res.status(400).json({ error: 'That address is too long.' });
+    }
+
+    const place = await geocodeUsAddress(rawAddress);
+    if (!place.ok) {
+      return res.json({
+        status: 'unsupported_region',
+        tier: 'preview',
+        message: 'Address removal help is U.S.-only for now',
+      });
+    }
+
+    // Only the STATE is used. Nothing about the specific address is
+    // stored, logged with the result, or needed for the answer.
+    const profile = unlistedService.getExposureProfile(place.state);
+    return res.json({
+      status: 'ready',
+      tier: 'preview',
+      place: { city: place.city, state: place.state },
+      unlisted: profile,
+      disclaimer: 'We did not save this address. Claim it to keep track of which removals you have sent.',
+    });
+  } catch (err) {
+    console.error('[public/unlisted] Error:', err.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/public/residency-letters/:code — third-party letter check
 //
 // Anyone holding a residency letter can confirm it is genuine and not
