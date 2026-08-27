@@ -71,7 +71,16 @@ function seedVerified({ verification = 'verified' } = {}) {
 }
 
 const RECIPIENT = { line1: '1425 SE Oak St', city: 'Portland', state: 'OR', zip: '97214' };
-const RECIPIENT_HASH = computeAddressHash('1425 SE Oak St', '', 'Portland', 'OR', '97214');
+// The SUPPRESSION key (not the platform-wide computeAddressHash): this
+// is what the opt-out registry and the 90-day dedup are keyed on, and it
+// is deliberately stricter so formatting variants cannot bypass them.
+const RECIPIENT_HASH = blockFoundersService.suppressionHashFor(
+  { line1: '1425 SE Oak St', city: 'Portland', state: 'OR', zip: '97214' },
+);
+// What Home.address_hash carries platform-wide — the already-member gate
+// compares against this, on a normalized input so punctuation cannot
+// bypass it.
+const MEMBER_HASH = computeAddressHash('1425 SE Oak St', '', 'Portland', 'OR', '97214');
 
 function mockProvider() {
   const send = jest.fn().mockResolvedValue({ vendorJobId: 'psc_1', status: 'created' });
@@ -229,7 +238,7 @@ describe('invites', () => {
 
   test('an address already on Pantopus is refused', async () => {
     seedVerified();
-    seedTable('Home', [HOME_ROW, { id: 'neighbor-home', owner_id: 'x', address: '1425 SE Oak St', address_hash: RECIPIENT_HASH }]);
+    seedTable('Home', [HOME_ROW, { id: 'neighbor-home', owner_id: 'x', address: '1425 SE Oak St', address_hash: MEMBER_HASH }]);
     const res = await invite(buildApp());
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('ALREADY_MEMBER');
@@ -379,5 +388,78 @@ describe('the permanent opt-out survives formatting variants', () => {
     const unitB = suppressionHashFor({ line1: '1425 SE Oak St Apt 2', city: 'Portland', state: 'OR', zip: '97214' });
     expect(a).not.toBe(b);
     expect(unitA).not.toBe(unitB);
+  });
+});
+
+// ── Red-team regressions: the suppression key ────────────────
+// An independent red team defeated the first version of this on three
+// independent axes. Each is now pinned.
+describe('one mailbox is one suppression key, however it is typed', () => {
+  const { suppressionHashFor } = blockFoundersService;
+  const base = { city: 'Portland', state: 'OR', zip: '97214' };
+  const key = (line1, extra = {}) => suppressionHashFor({ ...base, ...extra, line1 });
+
+  test('punctuation and directional spellings collapse to one key', () => {
+    const canonical = key('1425 SE Oak St');
+    // The ordering bug: strip-then-expand made "S.E." -> "south east"
+    // while "SE" -> "southeast". A period defeated a permanent opt-out.
+    expect(key('1425 SE Oak St.')).toBe(canonical);
+    expect(key('1425 S.E. Oak Street')).toBe(canonical);
+    expect(key('1425 Southeast Oak St')).toBe(canonical);
+    expect(key('1425  SE   Oak  St')).toBe(canonical);
+    expect(key('1425 SE Oak St', { zip: '97214-1234' })).toBe(canonical);
+  });
+
+  test('unit designators canonicalize — USPS delivers them all to one box', () => {
+    const canonical = key('1425 SE Oak St Apt 2');
+    expect(key('1425 SE Oak St #2')).toBe(canonical);
+    expect(key('1425 SE Oak St Unit 2')).toBe(canonical);
+    expect(key('1425 SE Oak St Ste 2')).toBe(canonical);
+    expect(key('1425 SE Oak St Apartment 2')).toBe(canonical);
+    // ...but a DIFFERENT unit is a different mailbox.
+    expect(key('1425 SE Oak St Apt 3')).not.toBe(canonical);
+    // ...and the unit-less address is a different mailbox again.
+    expect(key('1425 SE Oak St')).not.toBe(canonical);
+  });
+
+  test('a city is not a street — "St Louis" must not become "street louis"', () => {
+    const a = suppressionHashFor({ line1: '5 Oak St', city: 'St Louis', state: 'MO', zip: '63101' });
+    const b = suppressionHashFor({ line1: '5 Oak St', city: 'Saint Louis', state: 'MO', zip: '63101' });
+    // Both spellings are the same city; at minimum neither may be
+    // silently rewritten into a street word.
+    expect(a).toBeTruthy();
+    expect(b).toBeTruthy();
+    // Genuinely different cities stay different.
+    expect(suppressionHashFor({ line1: '5 Oak St', city: 'Portland', state: 'MO', zip: '63101' })).not.toBe(a);
+  });
+});
+
+describe('the printed card cannot carry a message', () => {
+  const { sanitizeStreet } = blockFoundersService;
+
+  test('a sentence ending in a street-type word does not print', () => {
+    // Way / Walk / Run / Row / Path are street types AND English words,
+    // so a trailing-suffix check alone printed whole sentences.
+    expect(sanitizeStreet('1 Claim $500 at pantopus-refund.com Way')).toBe('your street');
+    expect(sanitizeStreet('1 MIKE ROSSI AT 14B IS A MOLESTER - Way')).toBe('your street');
+    expect(sanitizeStreet('1 Overdue water bill call 503-555-0100 Rd')).toBe('your street');
+    expect(sanitizeStreet('1 Text HELP to 555-0100 for $500 cash Ln')).toBe('your street');
+    // Real street names still print.
+    expect(sanitizeStreet('1421 SE Oak St')).toBe('SE Oak St');
+    expect(sanitizeStreet('100 Martin Luther King Jr Blvd')).toBe('Martin Luther King Jr Blvd');
+  });
+
+  test('a recipient address must look like a US delivery line', () => {
+    const bad = (line1, city = 'Portland') => () => cleanAddressInput({ line1, city, state: 'OR', zip: '97214' });
+    // Lob prints line1 and city in the delivery block — a second text
+    // channel onto the same physical card.
+    expect(bad('MIKE ROSSI AT 14B IS A MOLESTER')).toThrow();
+    expect(bad('1 Call 555-0100 Now For Free Money Way')).toThrow();
+    expect(bad('1425 SE Oak St', 'Portland CALL 5550100')).toThrow();
+    // A real address still passes.
+    expect(cleanAddressInput({ line1: '1425 SE Oak St', city: 'Portland', state: 'OR', zip: '97214' }).line1)
+      .toBe('1425 SE Oak St');
+    expect(cleanAddressInput({ line1: '1425 SE Oak St Apt 2', city: 'St. Louis', state: 'MO', zip: '63101' }).city)
+      .toBe('St. Louis');
   });
 });

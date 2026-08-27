@@ -752,9 +752,11 @@ async function composeRealRent(home, tier, userId) {
           rent_median: null,
           rent_p75: null,
           standing: null,
+          // "other homes": the viewer's own report is deliberately not
+          // in the sample, so counting it here would overstate progress.
           summary: benchmark.reports === 0
-            ? `Be the first: ${benchmark.needed} verified homes on your block unlock what people here really pay.`
-            : `${benchmark.reports} of ${benchmark.needed} verified homes on your block have shared their rent.`,
+            ? `Be the first: ${benchmark.needed} other verified homes on your block unlock what people here really pay.`
+            : `${benchmark.reports} of ${benchmark.needed} other verified homes on your block have shared their rent.`,
         },
       })];
     }
@@ -762,7 +764,7 @@ async function composeRealRent(home, tier, userId) {
     const scopeLabel = benchmark.scope === 'bedrooms' && benchmark.bedrooms != null
       ? (benchmark.bedrooms === 0 ? 'studios' : `${benchmark.bedrooms}-bedroom homes`)
       : 'homes of all sizes';
-    const summary = `${benchmark.sample_size} verified ${scopeLabel} on your block pay a median of $${benchmark.rent_median.toLocaleString('en-US')}/mo.`;
+    const summary = `${benchmark.sample_size} other verified ${scopeLabel} on your block pay a median of $${benchmark.rent_median.toLocaleString('en-US')}/mo.`;
 
     return [serializePlaceSection('real_rent', {
       access,

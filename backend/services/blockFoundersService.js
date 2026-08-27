@@ -27,7 +27,7 @@ const crypto = require('crypto');
 const supabaseAdmin = require('../config/supabaseAdmin');
 const logger = require('../utils/logger');
 const { encodeGeohash } = require('../utils/geohash');
-const { computeAddressHash } = require('../utils/normalizeAddress');
+const { computeAddressHash, expandAbbreviations } = require('../utils/normalizeAddress');
 const { readRawCountForVerifiedInsider } = require('./place/densityReader');
 const realRentService = require('./realRentService');
 const { mailVendorService } = require('./addressValidation');
@@ -98,18 +98,36 @@ function cellForHome(home) {
  * the platform, and re-defining it would invalidate every stored row.
  */
 function suppressionHashFor(address) {
-  const unitMatch = UNIT_TOKEN_RE.exec(String(address.line1 || ''));
-  const unit = unitMatch ? unitMatch[0] : '';
-  const streetPart = String(address.line1 || '').replace(UNIT_TOKEN_RE, '');
-  const strip = (s) => String(s || '').replace(/[^A-Za-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-  return computeAddressHash(
-    strip(streetPart),
-    strip(unit),
-    strip(address.city),
-    strip(address.state),
+  // Order matters and the first version got it backwards: it stripped
+  // punctuation to SPACES and then let computeAddressHash expand
+  // abbreviations, so "S.E." became "s e" -> "south east" while "SE"
+  // became "southeast". Two keys, one mailbox, opt-out defeated by a
+  // period. Expansion must run on the raw token stream, then punctuation
+  // goes away.
+  const canon = (value) => expandAbbreviations(
+    String(value || '').toLowerCase().replace(/[.,]/g, '').replace(/\s+/g, ' ').trim(),
+  ).replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+
+  const raw = String(address.line1 || '');
+  const unitMatch = UNIT_TOKEN_RE.exec(raw);
+  const streetPart = raw.replace(UNIT_TOKEN_RE, '');
+  // The unit designator is canonicalized away entirely: USPS delivers
+  // "#2", "Unit 2", "Ste 2", "Apt 2" and "Apartment 2" to the same box,
+  // so only the identifier itself may key the suppression.
+  const unitId = unitMatch
+    ? String(unitMatch[0]).toLowerCase().replace(/[^a-z0-9]/g, '').replace(/^(apartment|apt|unit|suite|ste|floor|fl|room|rm|no)/, '')
+    : '';
+
+  return crypto.createHash('sha256').update([
+    canon(streetPart),
+    unitId,
+    // NOT abbreviation-expanded: "St Louis" must not become
+    // "street louis", and a city is not a street.
+    String(address.city || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim(),
+    String(address.state || '').toLowerCase().replace(/[^a-z]/g, ''),
     // ZIP+4 and ZIP5 are the same mailbox for suppression purposes.
     String(address.zip || '').replace(/\D/g, '').slice(0, 5),
-  );
+  ].join('|')).digest('hex');
 }
 
 /** HTML-escape. Every interpolation into a postcard template goes through this. */
@@ -128,18 +146,39 @@ function escapeHtml(value) {
 const UNIT_TOKEN_RE = /(\s(apt|apartment|unit|ste|suite|fl|floor|rm|room|no)\b.*$|\s*#.*$)/i;
 const STREET_MAX_LEN = 40;
 
-// A printable street ends in a recognizable street type. This is the
-// load-bearing check: sanitizing characters stops MARKUP, but a sender
-// whose "address" is "Call 555-0100 Now" would still have those words
-// printed and mailed under Pantopus's return address. Requiring a real
-// street suffix means the worst a sender can put on a card is a
-// plausible street name — which is what the field is for. Anything
-// else falls back to "your street", and the card reads perfectly well.
-const STREET_SUFFIX_RE = new RegExp(
-  '^[A-Za-z0-9 .\'-]{1,40}\\b(st|street|ave|avenue|rd|road|blvd|boulevard|ln|lane|dr|drive|ct|court'
-  + '|pl|place|ter|terrace|pkwy|parkway|cir|circle|hwy|highway|way|trl|trail|loop|run|row|walk|path)\\.?$',
-  'i',
-);
+// A printable street must LOOK like a street, not merely end in one.
+//
+// Red-teaming the first version of this proved that a trailing street
+// type is not a shape test: "Way", "Walk", "Run", "Row", "Path" and
+// "Loop" are ordinary English words, so "Claim $500 at
+// pantopus-refund.com Way" and "MIKE ROSSI AT 14B IS A MOLESTER - Way"
+// both passed and were printed, in bold, on physical mail. The channel
+// carries whatever language fits in the character whitelist.
+//
+// So the shape is now constrained the way a real street name is:
+//   * at most 4 tokens before the street type (covers
+//     "Martin Luther King Jr Blvd");
+//   * no token longer than 15 characters;
+//   * no run of 3+ digits anywhere (kills phone numbers);
+//   * no token containing a dot followed by 2-4 letters (kills domains).
+const STREET_TYPES = 'st|street|ave|avenue|rd|road|blvd|boulevard|ln|lane|dr|drive|ct|court'
+  + '|pl|place|ter|terrace|pkwy|parkway|cir|circle|hwy|highway|way|trl|trail|loop|run|row|walk|path';
+const STREET_SUFFIX_RE = new RegExp(`^[A-Za-z0-9 .'-]{1,40}\\b(${STREET_TYPES})\\.?$`, 'i');
+const DIGIT_RUN_RE = /\d{3,}/;
+const DOMAINISH_RE = /\.[A-Za-z]{2,4}\b/;
+const STREET_TOKEN_MAX = 15;
+const STREET_TOKENS_BEFORE_TYPE_MAX = 4;
+
+/** Does this look like a street NAME, rather than a sentence ending in one? */
+function looksLikeStreetName(value) {
+  const v = String(value || '').trim();
+  if (!v || !STREET_SUFFIX_RE.test(v)) return false;
+  if (DIGIT_RUN_RE.test(v)) return false;
+  if (DOMAINISH_RE.test(v)) return false;
+  const tokens = v.split(/\s+/);
+  if (tokens.length - 1 > STREET_TOKENS_BEFORE_TYPE_MAX) return false;
+  return tokens.every((t) => t.length <= STREET_TOKEN_MAX);
+}
 
 /**
  * The ONLY sender-derived text that reaches a printed card: their street.
@@ -192,7 +231,7 @@ function sanitizeStreet(line1) {
     .trim()
     .slice(0, STREET_MAX_LEN)
     .trim();
-  return STREET_SUFFIX_RE.test(safe) ? safe : 'your street';
+  return looksLikeStreetName(safe) ? safe : 'your street';
 }
 
 /**
@@ -292,9 +331,24 @@ async function getBlockStatus({ home, userId }) {
 
 // ── Invites ──────────────────────────────────────────────────
 
+// The RECIPIENT address is the second sender-controlled text channel
+// onto the same physical card: Lob prints line1 and city in the
+// delivery block. The old version allowed 100 arbitrary characters in
+// line1 and 60 in city, so a sender could mail a stranger a card whose
+// address block read "MIKE ROSSI AT 14B IS A MOLESTER" — larger, and
+// with no sanitizer at all, than the sender-street channel that was
+// being so carefully guarded.
+//
+// A US delivery line has a shape: house number, street name, optional
+// unit. Requiring it costs nothing (a malformed address would not have
+// been delivered anyway) and closes the channel.
+const HOUSE_NUMBER_RE = /^\d+[A-Za-z]?(-\d+[A-Za-z]?)?\s+/;
+const CITY_RE = /^[A-Za-z][A-Za-z .'-]{1,29}$/;
+const RECIPIENT_LINE1_MAX = 60;
+
 function cleanAddressInput(recipient) {
-  const line1 = String((recipient && recipient.line1) || '').replace(/\s+/g, ' ').trim().slice(0, 100);
-  const city = String((recipient && recipient.city) || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const line1 = String((recipient && recipient.line1) || '').replace(/\s+/g, ' ').trim().slice(0, RECIPIENT_LINE1_MAX);
+  const city = String((recipient && recipient.city) || '').replace(/\s+/g, ' ').trim().slice(0, 30);
   // Validate BEFORE truncating — 'Oregon'.slice(0, 2) would silently
   // pass as 'OR' when the sender typed the wrong thing.
   const stateRaw = String((recipient && recipient.state) || '').trim();
@@ -302,6 +356,16 @@ function cleanAddressInput(recipient) {
   const zip = String((recipient && recipient.zip) || '').trim().slice(0, 10);
   if (!line1 || !city || !/^[A-Z]{2}$/.test(state) || !/^\d{5}(-\d{4})?$/.test(zip)) {
     throw new BlockFoundersError('Enter the neighbor\'s street address, city, state, and ZIP.', 'BAD_ADDRESS');
+  }
+  // Shape, not just presence: a house number, then something that reads
+  // as a street name (with an optional unit after it).
+  const rest = line1.replace(HOUSE_NUMBER_RE, '');
+  const streetPart = rest.replace(UNIT_TOKEN_RE, '').trim();
+  if (!HOUSE_NUMBER_RE.test(line1) || !looksLikeStreetName(streetPart) || !CITY_RE.test(city)) {
+    throw new BlockFoundersError(
+      'That does not look like a US street address. Enter it as it appears on the mailbox.',
+      'BAD_ADDRESS',
+    );
   }
   return { line1, city, state, zip };
 }
@@ -355,7 +419,17 @@ async function sendInvite({ home, userId, recipient }) {
   //     hear from us, and the loose hash let trivial formatting variants
   //     of one mailbox ("1425 SE Oak St." vs "1425 SE Oak St") defeat
   //     both — a permanent opt-out that a period bypasses is not one.
-  const memberHash = computeAddressHash(address.line1, '', address.city, address.state, address.zip);
+  // Home.address_hash is written platform-wide with computeAddressHash,
+  // so the already-member gate must use it — but the RAW input is
+  // normalized first, or a trailing period defeats the gate and mails a
+  // recruitment card to an existing member.
+  const memberHash = computeAddressHash(
+    address.line1.replace(/[.,]/g, '').replace(/\s+/g, ' ').trim(),
+    '',
+    address.city.replace(/[.,]/g, '').replace(/\s+/g, ' ').trim(),
+    address.state,
+    address.zip.replace(/\D/g, '').slice(0, 5),
+  );
   const suppressionHash = suppressionHashFor(address);
 
   // Read the registry under BOTH hashes. A suppression must never

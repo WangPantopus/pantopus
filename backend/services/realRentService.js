@@ -133,10 +133,22 @@ function roundToBin(dollars) {
   return Math.round(dollars / PUBLISH_ROUNDING_DOLLARS) * PUBLISH_ROUNDING_DOLLARS;
 }
 
+// Published figures average a WINDOW, never a single order statistic.
+// Nearest-rank selection returns one array element, so p25/median/p75
+// were literally three neighbours' rents — binning to $25 only blurred
+// them, and for rent a $25 window is effectively exact. Averaging at
+// least three values means no published number is any one household's.
+const PUBLISH_WINDOW = 3;
+
 function quantile(sortedCents, q) {
   if (!sortedCents.length) return null;
   const idx = Math.min(sortedCents.length - 1, Math.max(0, Math.round(q * (sortedCents.length - 1))));
-  return roundToBin(sortedCents[idx] / 100);
+  const half = Math.floor(PUBLISH_WINDOW / 2);
+  const lo = Math.max(0, Math.min(idx - half, sortedCents.length - PUBLISH_WINDOW));
+  const hi = Math.min(sortedCents.length, lo + PUBLISH_WINDOW);
+  const window = sortedCents.slice(Math.max(0, lo), hi);
+  const mean = window.reduce((a, b) => a + b, 0) / window.length;
+  return roundToBin(mean / 100);
 }
 
 // ── The resident's own report ────────────────────────────────
@@ -246,7 +258,7 @@ async function readCellReports(geohash6) {
  * @param {Array<{monthly_rent_cents:number, bedrooms:number|null}>} rows
  * @param {number|null} bedrooms  the viewer's own bedroom count
  */
-function computeBlockRent(rows, bedrooms) {
+function computeBlockRent(rows, bedrooms, viewerHomeId) {
   const clean = (rows || [])
     .map((r) => ({
       homeId: r.home_id == null ? null : String(r.home_id),
@@ -268,6 +280,17 @@ function computeBlockRent(rows, bedrooms) {
   const byHome = new Map();
   const all = [];
   for (const r of clean) {
+    // THE VIEWER'S OWN ROW IS NEVER IN THE SAMPLE. This is the structural
+    // defence: the viewer controls that row completely and can rewrite it
+    // without limit, so including it let them (a) sweep their own value
+    // and read neighbours' figures out of the moving statistics, and
+    // (b) lift a 9-household cohort the floor is deliberately suppressing
+    // over the line using nothing but their own contribution. Anchoring
+    // the cohort to the home record only moved that lever one editable
+    // field away; removing the row removes it. It also reads better: the
+    // band is what the NEIGHBOURS pay, which is what a standing is
+    // measured against.
+    if (viewerHomeId != null && r.homeId === String(viewerHomeId)) continue;
     if (r.homeId == null) { all.push(r); continue; }
     const held = byHome.get(r.homeId);
     if (!held || String(r.updatedAt) > String(held.updatedAt)) byHome.set(r.homeId, r);
@@ -328,7 +351,7 @@ async function getBlockBenchmark({ home, userId }) {
   if (rows === null) return null;
 
   const bedrooms = normalizeBedrooms(own && own.bedrooms, home);
-  const benchmark = computeBlockRent(rows, bedrooms);
+  const benchmark = computeBlockRent(rows, bedrooms, home.id);
 
   if (benchmark.suppressed) {
     return {

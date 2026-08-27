@@ -19,6 +19,7 @@ const router = express.Router();
 
 const verifyToken = require('../middleware/verifyToken');
 const { checkHomePermission, isVerifiedResident } = require('../utils/homePermissions');
+const { homeOutboundLimiter } = require('../middleware/rateLimiter');
 const blockFoundersService = require('../services/blockFoundersService');
 const supabaseAdmin = require('../config/supabaseAdmin');
 const logger = require('../utils/logger');
@@ -64,7 +65,11 @@ router.get('/:id/block-founders', verifyToken, async (req, res) => {
 });
 
 // POST /api/homes/:id/block-founders/invites
-router.post('/:id/block-founders/invites', verifyToken, async (req, res) => {
+// homeOutboundLimiter: this is the ONE route in the Place surface that
+// spends real money and puts physical mail in front of a stranger. The
+// weekly cap bounds successful sends; this bounds ATTEMPTS, which the
+// cap does not — a rejected send still costs a vendor round-trip.
+router.post('/:id/block-founders/invites', verifyToken, homeOutboundLimiter, async (req, res) => {
   try {
     const gated = await gatedHome(req, res);
     if (!gated) return undefined;

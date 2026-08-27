@@ -246,7 +246,10 @@ describe('getBlockBenchmark', () => {
     ]);
     const out = await realRentService.getBlockBenchmark({ home: CELL_HOME, userId: USER });
     expect(out.status).toBe('building');
-    expect(out.reports).toBe(1);
+    // The only report in the cell is the viewer's OWN, which is never in
+    // the sample — progress counts other households, and their own rent
+    // still comes back so the card can show it.
+    expect(out.reports).toBe(0);
     expect(out.needed).toBe(K_MIN);
     expect(out.your_rent).toBe(2400);
     expect(out.rent_median).toBeUndefined();
@@ -391,5 +394,57 @@ describe('the amount round-trips exactly', () => {
       .set('x-test-user-id', USER)
       .send({ monthly_rent: stored });
     expect(second.body.report.monthly_rent).toBe(stored);
+  });
+});
+
+// ── Red-team regression: self-exclusion ──────────────────────
+// A red team defeated the earlier controls by exploiting the fact that
+// the viewer's own row was in the sample: they could sweep their own
+// value to read neighbours' figures out of the moving statistics, and
+// lift a deliberately-suppressed 9-household cohort over the floor with
+// nothing but their own contribution. The row is now excluded outright.
+describe('the viewer cannot influence the band they read', () => {
+  function neighbours(n, cents = 200000) {
+    return Array.from({ length: n }, (_, i) => ({
+      home_id: `n${i}`, user_id: `u${i}`, monthly_rent_cents: cents + i * 1000,
+      bedrooms: 2, updated_at: '2026-08-01T00:00:00.000Z',
+    }));
+  }
+  const mine = (cents) => ({
+    home_id: 'MINE', user_id: 'me', monthly_rent_cents: cents,
+    bedrooms: 2, updated_at: '2026-08-09T00:00:00.000Z',
+  });
+
+  test('a suppressed 9-household cohort cannot be lifted by contributing', () => {
+    const nine = neighbours(9);
+    expect(computeBlockRent(nine, 2, 'MINE').suppressed).toBe(true);
+    // Adding my own row must NOT open the band.
+    const withMine = computeBlockRent([...nine, mine(300000)], 2, 'MINE');
+    expect(withMine.suppressed).toBe(true);
+    expect(withMine.reports).toBe(9);
+  });
+
+  test('sweeping my own value cannot move a single published figure', () => {
+    const ten = neighbours(10);
+    const at = (cents) => computeBlockRent([...ten, mine(cents)], 2, 'MINE');
+    const low = at(5000);
+    const high = at(5000000);
+    expect(low.rent_p25).toBe(high.rent_p25);
+    expect(low.rent_median).toBe(high.rent_median);
+    expect(low.rent_p75).toBe(high.rent_p75);
+    expect(low.sample_size).toBe(high.sample_size);
+  });
+
+  test('no published figure is any single household rent', () => {
+    // Ten deliberately distinct, un-round rents.
+    const rows = [1237, 1462, 1688, 1913, 2044, 2166, 2311, 2489, 2637, 2988].map((d, i) => ({
+      home_id: `n${i}`, user_id: `u${i}`, monthly_rent_cents: d * 100,
+      bedrooms: 2, updated_at: '2026-08-01T00:00:00.000Z',
+    }));
+    const out = computeBlockRent(rows, 2, 'MINE');
+    const raw = new Set([1237, 1462, 1688, 1913, 2044, 2166, 2311, 2489, 2637, 2988]);
+    for (const published of [out.rent_p25, out.rent_median, out.rent_p75]) {
+      expect(raw.has(published)).toBe(false);
+    }
   });
 });
