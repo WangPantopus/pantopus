@@ -1,8 +1,8 @@
 // ============================================================
 // /unlisted — the anonymous "get my address off the internet" surface.
-// Public: renders outside the app chrome and outside the app's
-// QueryClientProvider. Never indexed — someone arriving here may not
-// want the visit discoverable, and the page persists nothing.
+// Public: renders outside the app chrome. Never indexed — someone
+// arriving here may not want the visit discoverable, and the page
+// persists nothing.
 // ============================================================
 
 import type { Metadata, Viewport } from 'next';

@@ -226,11 +226,28 @@ app.use(cookieParser());
 // writing it next to an IP + user agent would turn the log stream into
 // a directory of live codes.
 const BEARER_CODE_PATH = /^(\/api\/public\/(?:fridge-cards|residency-claims|residency-letters|block-invites\/opt-out))\/[^/]+/i;
+
+// Paths where the REQUEST ITSELF is the sensitive fact, so no caller
+// identifiers are recorded alongside it.
+//
+// Unlisted is "get my address off the internet". Its readers are
+// disproportionately hiding from a specific person, the feature promises
+// in writing that we do not record that they looked, and the route
+// deliberately persists nothing and sends nothing to a third party — all
+// of which an IP + user-agent + timestamp row quietly undoes. The typed
+// address was never logged (it is a query param; `req.path` excludes the
+// query string), but "this IP opened the page for people hiding their
+// address" is itself the disclosure worth avoiding.
+//
+// The path is still logged, so volume, latency and errors stay visible,
+// and abuse control is unaffected — the mount-level previewLimiter rate
+// limits per IP without reading this log.
+const NO_CALLER_ID_PATH = /^\/api\/public\/unlisted$/i;
 app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.path.replace(BEARER_CODE_PATH, '$1/:code')}`, {
-    ip: req.ip,
-    userAgent: req.get('user-agent')
-  });
+  const path = req.path.replace(BEARER_CODE_PATH, '$1/:code');
+  logger.info(`${req.method} ${path}`, NO_CALLER_ID_PATH.test(req.path)
+    ? {}
+    : { ip: req.ip, userAgent: req.get('user-agent') });
   next();
 });
 

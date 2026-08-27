@@ -2,8 +2,9 @@
 // The Block Founders opt-out surface. One promise, one button, no
 // account, no questions. Success and not-found copy are deliberately
 // calm: this page exists for someone who got mail they didn't ask for.
-// Public routes render outside the app's QueryClientProvider (see
-// FridgeCardView), so this uses plain state, not react-query.
+// Plain state, not react-query — a choice, not a constraint. The root
+// layout wraps every route in QueryProvider; nothing on this one page is
+// worth a cache entry.
 // ============================================================
 
 'use client';

@@ -639,6 +639,13 @@ router.get('/unlisted', async (req, res) => {
     // whole verified removal list, with `state_program: null`, which the
     // clients already render as "we have not confirmed one for your
     // state" rather than "your state has none".
+    //
+    // A genuinely non-US address also lands here now, since the local
+    // resolver has no opinion about London. That is the right trade:
+    // showing a US removal list to someone abroad wastes their time,
+    // whereas the old behaviour told someone standing in Portland the
+    // product was not for them. The client copy carries the US scope so
+    // the non-US reader is not misled either.
     if (!state) {
       return res.json({
         status: 'could_not_place',

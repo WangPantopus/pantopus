@@ -2,9 +2,12 @@
 // /unlisted — "type your address to get it off the internet", with no
 // account and nothing stored.
 //
-// Public routes render OUTSIDE the app's QueryClientProvider (see
-// FridgeCardView / NoMailView), so this uses plain useState + the api
-// client. No react-query here.
+// Plain useState + the api client, deliberately — NOT because react-query
+// is unavailable. The root layout wraps every route in QueryProvider, so
+// the older comment here claiming public routes render outside it was
+// simply wrong. The reason is that this page must not participate in the
+// app's cache: a cached query keyed on a typed address is a record of the
+// lookup, on the one surface that promises there isn't one.
 //
 // Order on the page is the product:
 //   1. QUICK EXIT, reachable from the first paint.
@@ -134,7 +137,8 @@ export default function UnlistedView() {
             </h2>
             <p className="text-[13.5px] text-app-text-secondary leading-[20px] mt-1.5">
               Add the state or ZIP — &ldquo;Portland, OR&rdquo; or &ldquo;97214&rdquo; — and your state&apos;s
-              program appears too. Everything below applies wherever you are in the U.S.
+              program appears too. Everything below applies anywhere in the U.S.; the programs and removal paths
+              come from U.S. law and U.S. public-record sites, so outside the U.S. they will not help you.
             </p>
           </div>
         ) : null}
