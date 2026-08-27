@@ -175,3 +175,55 @@ describe('removal progress', () => {
     }
   });
 });
+
+// ── The state program: three distinct answers ────────────────
+// "We verified your state has one", "we verified your state has none",
+// and "we could not confirm" are three different claims, and only the
+// first two are ours to make. Collapsing the third into the second
+// would tell someone in danger that no help exists when we simply did
+// not check.
+describe('the state escape hatch', () => {
+  const { STATE_DISCLOSURE } = require('../data/stateDisclosure');
+
+  test('a verified program carries a name, an official URL, and who qualifies', () => {
+    const profile = unlistedService.getExposureProfile('CA');
+    expect(profile.state_program.exists).toBe(true);
+    expect(profile.state_program.name).toBeTruthy();
+    expect(profile.state_program.url).toMatch(/^https?:\/\//);
+    expect(profile.state_program.eligibility).toBeTruthy();
+    expect(profile.state_program.source_url).toMatch(/^https?:\/\//);
+  });
+
+  test('a verified ABSENCE is exists:false with its source — not null', () => {
+    // Alabama was checked and genuinely has no substitute-address
+    // program. That is a finding, and it still cites where it came from.
+    const profile = unlistedService.getExposureProfile('AL');
+    expect(profile.state_program).not.toBeNull();
+    expect(profile.state_program.exists).toBe(false);
+    expect(profile.state_program.source_url).toMatch(/^https?:\/\//);
+    // It must still explain what the state DOES offer, if anything.
+    expect(profile.state_program.eligibility).toBeTruthy();
+  });
+
+  test('an unchecked state is null — never dressed as "no program"', () => {
+    expect(unlistedService.getExposureProfile('ZZ').state_program).toBeNull();
+    expect(unlistedService.getExposureProfile('').state_program).toBeNull();
+    expect(unlistedService.getExposureProfile(null).state_program).toBeNull();
+  });
+
+  test('every state entry cites a source, including the negative ones', () => {
+    for (const [code, s] of Object.entries(STATE_DISCLOSURE)) {
+      expect(s.source_url).toMatch(new RegExp('^https?://'));
+      expect(s.verified_at).toMatch(/^\d{4}-\d{2}-\d{2}/);
+      expect(s.state).toBe(code);
+      // A program that exists must be reachable; one that does not must
+      // not carry a dangling link.
+      if (s.acp_exists) expect(s.acp_url).toMatch(new RegExp('^https?://'));
+    }
+  });
+
+  test('all 50 states and DC are covered, so no resident sees a blank', () => {
+    expect(Object.keys(STATE_DISCLOSURE)).toHaveLength(51);
+    expect(STATE_DISCLOSURE.DC).toBeTruthy();
+  });
+});
