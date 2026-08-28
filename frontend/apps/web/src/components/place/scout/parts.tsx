@@ -57,7 +57,7 @@ export function AskRow({
         </p>
         <p className="text-[13px] leading-[19px] text-app-text-secondary mt-1">{ask.because}</p>
         {ask.source ? (
-          <p className="text-[12.5px] text-app-text-muted mt-1.5">{ask.source}</p>
+          <p data-testid="ask-source" className="text-[12.5px] text-app-text-muted mt-1.5">{ask.source}</p>
         ) : null}
       </div>
     </li>
@@ -84,8 +84,17 @@ export function BandTrack({
   markerLabel?: string;
   format: (n: number) => string;
 }) {
-  const span = Math.max(1, high - low);
-  const pct = marker == null ? null : Math.min(100, Math.max(0, ((marker - low) / span) * 100));
+  // `low === high` is the COMMON case, not an edge one: HUD prices most
+  // counties at a single figure. Without the guard the span collapses and
+  // every marker pins to one end.
+  const degenerate = high <= low;
+  const span = degenerate ? 1 : high - low;
+  const rawPct = marker == null ? null : ((marker - low) / span) * 100;
+  const pct = rawPct == null ? null : Math.min(100, Math.max(0, rawPct));
+  // An asking rent outside the band was CLAMPED into it and then printed
+  // between the two endpoints, so a rent well over the top of the band
+  // rendered as though it sat inside. Say which side it fell off.
+  const outside = rawPct == null ? null : rawPct < 0 ? 'below' : rawPct > 100 ? 'above' : null;
 
   return (
     <div className="mt-3">
@@ -93,7 +102,9 @@ export function BandTrack({
         <div className="absolute inset-y-0 left-0 right-0 rounded-full bg-app-home/25" />
         {pct != null ? (
           <span
-            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[13px] h-[13px] rounded-full bg-app-home border-2 border-app-surface shadow-sm"
+            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[13px] h-[13px] rounded-full border-2 border-app-surface shadow-sm ${
+              outside ? 'bg-app-warning' : 'bg-app-home'
+            }`}
             style={{ left: `${pct}%` }}
             aria-hidden="true"
           />
@@ -102,7 +113,10 @@ export function BandTrack({
       <div className="flex items-center justify-between mt-1.5 text-[12.5px] text-app-text-muted tabular-nums">
         <span>{format(low)}</span>
         {marker != null && markerLabel ? (
-          <span className="font-semibold text-app-text">{markerLabel}</span>
+          <span className="font-semibold text-app-text">
+            {markerLabel}
+            {outside === 'above' ? ' — above this band' : outside === 'below' ? ' — below this band' : ''}
+          </span>
         ) : null}
         <span>{format(high)}</span>
       </div>
@@ -203,11 +217,18 @@ export function ScopeNote({ note }: { note: string }) {
   );
 }
 
+/**
+ * A real heading, not a styled div. The report is a long single column of
+ * labelled sections, and with bare divs the entire page had exactly one
+ * heading — so a screen-reader user had no way to move between "What to
+ * ask", "Flood", "Rent" and the rest except by reading it all. The
+ * sibling Unlisted surface already uses real headings.
+ */
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[11px] font-bold uppercase tracking-[0.07em] text-app-text-muted mt-7 mb-2 px-1">
+    <h2 className="text-[11px] font-bold uppercase tracking-[0.07em] text-app-text-muted mt-7 mb-2 px-1">
       {children}
-    </div>
+    </h2>
   );
 }
 

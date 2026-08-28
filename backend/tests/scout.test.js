@@ -618,7 +618,13 @@ describe('the route distinguishes "could not place" from "not in the US"', () =>
       .query({ address: '10 Downing Street, London' });
 
     expect(res.body.status).toBe('unsupported_region');
-    expect(res.body.message).toMatch(/U\.S\.-only/i);
+    // NOT "U.S.-only": Puerto Rico, the U.S. Virgin Islands and Guam ARE
+    // the United States and fail the mainland bounding box, so that
+    // phrasing tells a resident of a U.S. territory they are not in
+    // their own country. Say what is true — no coverage — without
+    // asserting where the reader is.
+    expect(res.body.message).toMatch(/does not cover that area/i);
+    expect(res.body.message).not.toMatch(/U\.S\.-only/i);
   });
 });
 

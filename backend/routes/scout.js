@@ -48,9 +48,13 @@ function bedroomCount(value) {
   // silently became a stated studio, and `bedrooms_stated: true` told the
   // reader we had judged the unit size they gave us when they gave us
   // nothing. Absence has to stay absent.
-  if (typeof value !== 'string' || value.trim() === '') return undefined;
+  // A plain integer 0-4 and nothing else. `Number` accepts '2.6' (rounded
+  // to a count nobody typed) and '0x3' (3), so the shape is checked
+  // before the value: a bedroom count the reader did not enter must not
+  // become one we then report back to them as stated.
+  if (typeof value !== 'string' || !/^\d$/.test(value.trim())) return undefined;
   const n = Number(value.trim());
-  return Number.isFinite(n) && n >= 0 && n <= 4 ? Math.round(n) : undefined;
+  return n >= 0 && n <= 4 ? n : undefined;
 }
 
 // GET /api/scout — the report for an address you are considering
@@ -88,7 +92,13 @@ router.get('/', verifyToken, aiDraftLimiter, async (req, res) => {
         status: unplaceable ? 'could_not_place' : 'unsupported_region',
         message: unplaceable
           ? 'We could not find that address — try adding the city and state'
-          : 'Scout is U.S.-only for now',
+          // NOT "U.S.-only": Puerto Rico, the U.S. Virgin Islands and Guam
+          // ARE the United States and fail the mainland bounding box, so
+          // that phrasing tells a resident of a U.S. territory they are
+          // not in their own country. This says what is actually true —
+          // we do not have coverage there — without asserting where the
+          // reader is.
+          : 'Scout does not cover that area yet',
       });
     }
 

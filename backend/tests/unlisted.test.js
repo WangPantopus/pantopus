@@ -340,10 +340,14 @@ describe('removal progress', () => {
 
   test('a genuinely absent home is still a 404', async () => {
     // The two answers must stay distinguishable in both directions.
+    // The permission check answers first for an unknown id, so this is a
+    // 403 — asserting `[403, 404]` let the test pass without ever reaching
+    // the branch it named. What actually matters is the NEGATIVE: an
+    // absent home must never be reported as a database failure.
     const res = await request(buildApp())
       .get('/api/homes/home-that-does-not-exist/unlisted')
       .set('x-test-user-id', USER);
-    expect([403, 404]).toContain(res.status);
+    expect(res.status).toBe(403);
     expect(res.status).not.toBe(500);
   });
 

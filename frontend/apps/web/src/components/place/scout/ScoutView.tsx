@@ -99,7 +99,15 @@ export default function ScoutView({ report, onNewSearch }: { report: ScoutReport
             </>
           ) : (
             <p className="text-[13.5px] text-app-text-secondary">
-              Nothing specific to flag from public records here. The questions below still apply to any place.
+              {/*
+                "The questions below" pointed at an empty list — the ask
+                list IS this card. In practice askBeforeYouSign always
+                returns at least one question, so this branch is
+                unreachable today; it stays as a guard against a payload
+                this client did not compose, and now describes the page.
+              */}
+              Nothing stood out in the public records for this address. The facts below are still worth reading
+              before you commit.
             </p>
           )}
         </Card>

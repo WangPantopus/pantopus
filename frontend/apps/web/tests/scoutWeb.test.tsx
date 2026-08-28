@@ -114,14 +114,16 @@ beforeEach(() => {
 
 describe('an address we could not place is not a geographic denial', () => {
   it('says what would help, and never that the reader is outside the U.S.', async () => {
+    // A message DIFFERENT from the client's own fallback, so this proves
+    // the server's string is what renders. With them identical the test
+    // passed even when the server value was ignored entirely.
     getScoutReport.mockResolvedValue({
       status: 'could_not_place',
-      message: 'We could not find that address — try adding the city and state',
+      message: 'Server said: we could not find 1421 SE Oak St',
     });
     await runLookup();
 
-    expect(await screen.findByText(/could not find that address/i)).toBeInTheDocument();
-    // Appears in both the server's message and our follow-up line.
+    expect(await screen.findByText(/server said: we could not find 1421 SE Oak St/i)).toBeInTheDocument();
     expect(screen.getAllByText(/city and state/i).length).toBeGreaterThan(0);
     // The exact laundering that shipped on the sibling surface.
     expect(screen.queryByText(/U\.S\.-only/i)).not.toBeInTheDocument();
@@ -176,7 +178,10 @@ describe('the question list', () => {
     await runLookup();
 
     const row = (await screen.findByText(/what has been repaired or replaced/i)).closest('li') as HTMLElement;
-    expect(within(row).queryByText('null')).not.toBeInTheDocument();
+    // The ABSENCE assertion. Checking only that the string "null" is
+    // missing passes with the guard removed, because React renders a
+    // null child as nothing — so it proved nothing about the guard.
+    expect(within(row).queryByTestId('ask-source')).not.toBeInTheDocument();
     expect(row.textContent).not.toMatch(/\bnull\b/);
     // The sibling row DOES have a source, so this is a real distinction.
     const sourced = (await screen.findByText(/who pays for flood insurance/i)).closest('li') as HTMLElement;
@@ -318,6 +323,64 @@ describe('the hero copy', () => {
     const select = screen.getByLabelText(/bedrooms/i);
     expect(within(select).queryByText('4+')).not.toBeInTheDocument();
     expect(within(select).getByText('4')).toBeInTheDocument();
+  });
+});
+
+// ── The band track's two degenerate cases ───────────────────
+
+describe('the band track', () => {
+  it('says which side an out-of-band rent fell off, not just where the dot sits', async () => {
+    // The marker was CLAMPED into the track and then printed between the
+    // two endpoints, so a rent well over the top of the band rendered as
+    // though it sat inside it.
+    getScoutReport.mockResolvedValue({
+      status: 'ready',
+      scout: report({
+        rent: {
+          band_low: 1600, band_high: 1920, period: 'FY 2026', asking_rent: 4000,
+          bedrooms: 2, bedrooms_stated: true, position: 'above_band', scope: 'county',
+        },
+      }),
+    });
+    await runLookup();
+
+    const card = (await screen.findByText(/HUD fair market rent/i)).closest('div.bg-app-surface') as HTMLElement;
+    expect(card.textContent).toMatch(/above this band/i);
+  });
+
+  it('renders a single-figure HUD band without pinning the marker', async () => {
+    // band_low === band_high is the COMMON case — HUD prices most
+    // counties at one number — so the span must not collapse.
+    getScoutReport.mockResolvedValue({
+      status: 'ready',
+      scout: report({
+        rent: {
+          band_low: 1600, band_high: 1600, period: 'FY 2026', asking_rent: 1600,
+          bedrooms: 2, bedrooms_stated: true, position: 'in_band', scope: 'county',
+        },
+      }),
+    });
+    await runLookup();
+
+    const card = (await screen.findByText(/HUD fair market rent/i)).closest('div.bg-app-surface') as HTMLElement;
+    // Neither "above" nor "below" — the rent IS the band.
+    expect(card.textContent).not.toMatch(/above this band|below this band/i);
+  });
+});
+
+describe('the report is navigable', () => {
+  it('every section label is a real heading', async () => {
+    // With bare divs the whole report had one heading, so a screen-reader
+    // user had no way to move between sections except by reading it all.
+    getScoutReport.mockResolvedValue({ status: 'ready', scout: report() });
+    await runLookup();
+    await screen.findByText(/who pays for flood insurance/i);
+
+    const headings = screen.getAllByRole('heading');
+    const text = headings.map((h) => h.textContent).join(' | ');
+    expect(text).toMatch(/what to ask/i);
+    expect(text).toMatch(/flood/i);
+    expect(text).toMatch(/rent/i);
   });
 });
 
