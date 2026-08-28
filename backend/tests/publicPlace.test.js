@@ -8,7 +8,8 @@
  *     no DB writes at all (caches are in-memory, location-keyed, anonymous);
  *   • flood degrades independently of the Census tract lookup, and Walk Score
  *     is never fetched;
- *   • a non-US / ungeocodable address degrades to `unsupported_region` with
+ *   • a non-US address degrades to `unsupported_region` and an unreadable one
+ *     to `could_not_place` — DIFFERENT answers — with
  *     HTTP 200 — never a 500;
  *   • repeat requests are served from the in-memory cache (no second Mapbox /
  *     FEMA / Census round-trip).
@@ -295,42 +296,57 @@ describe('GET /api/public/place', () => {
     });
   });
 
-  describe('unsupported_region — never a 500', () => {
-    it('handles a non-US address (geocoder returns nothing → throws)', async () => {
+  describe('the two non-ready answers are two different answers', () => {
+    // These tests used to PIN THE CONFLATION: every geocoder failure was
+    // asserted to yield `unsupported_region`. The never-a-500 goal was
+    // right; the geographic laundering was not. A rejected geocode is a
+    // failure to READ the address, and telling a US resident during an
+    // outage that the product is not for them is the same class of
+    // falsehood the sibling routes were fixed for.
+    it('a geocoder that throws is "could not place", not a geographic denial', async () => {
       geo.forwardGeocode.mockRejectedValue(new Error('No result for address'));
-      const res = await request(buildApp()).get('/api/public/place').query({ address: '221B Baker St, London' });
+      const res = await request(buildApp()).get('/api/public/place').query({ address: '1421 SE Oak St' });
 
       expect(res.status).toBe(200);
-      expect(res.body.status).toBe('unsupported_region');
-      expect(res.body.region).toBeNull();
-      expect(res.body.message).toMatch(/U\.S\.-only/i);
+      expect(res.body.status).toBe('could_not_place');
+      expect(res.body.message).toMatch(/city and state/i);
+      expect(res.body.message).not.toMatch(/U\.S\.-only/i);
     });
 
-    it('handles an ungeocodable address (no result object)', async () => {
+    it('a geocoder that returns nothing is also "could not place"', async () => {
       geo.forwardGeocode.mockResolvedValue(null);
       const res = await request(buildApp()).get('/api/public/place').query({ address: 'asdfghjkl' });
 
       expect(res.status).toBe(200);
-      expect(res.body.status).toBe('unsupported_region');
+      expect(res.body.status).toBe('could_not_place');
+      expect(res.body.message).not.toMatch(/U\.S\.-only/i);
     });
 
-    it('handles a resolved point outside US coverage', async () => {
+    it('a point resolved OUTSIDE the US is the only geographic denial', async () => {
       // Valid lat/lng but in London — fails the US bounding-box guard.
+      // This is the one case the "U.S.-only" copy is true for.
       geo.forwardGeocode.mockResolvedValue({ latitude: 51.5237, longitude: -0.1585, city: 'London', state: 'England' });
       const res = await request(buildApp()).get('/api/public/place').query({ address: '221B Baker St' });
 
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('unsupported_region');
+      expect(res.body.message).toMatch(/U\.S\.-only/i);
       // A non-US lookup must not reach any external data source.
       expect(attomWasCalled()).toBe(false);
       expect(countFetch('hazards.fema.gov')).toBe(0);
       expect(countFetch('api.census.gov')).toBe(0);
     });
 
+    it('neither answer is ever a 500', async () => {
+      geo.forwardGeocode.mockRejectedValue(new Error('boom'));
+      const res = await request(buildApp()).get('/api/public/place').query({ address: 'x' });
+      expect(res.status).toBe(200);
+    });
+
     it('does not cache a transient geocoder failure (a retry can still succeed)', async () => {
       geo.forwardGeocode.mockRejectedValue(new Error('boom'));
       const first = await request(buildApp()).get('/api/public/place').query({ address: 'somewhere' });
-      expect(first.body.status).toBe('unsupported_region');
+      expect(first.body.status).toBe('could_not_place');
 
       geo.forwardGeocode.mockResolvedValue({ ...PORTLAND });
       const second = await request(buildApp()).get('/api/public/place').query({ address: 'somewhere' });

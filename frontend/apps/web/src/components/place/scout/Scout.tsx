@@ -105,9 +105,40 @@ export default function Scout() {
   const result = phase.kind === 'result' ? phase.result : null;
   const report = result?.status === 'ready' ? result.scout : undefined;
 
+  /*
+    A LIVE REGION THAT OUTLIVES THE BRANCH.
+    It sits above the early return on purpose: a region mounted at the
+    same moment its text appears is not announced by most screen readers,
+    so putting it inside either branch would make it useless. Between
+    submit and answer the page otherwise looks and sounds unchanged —
+    there is no skeleton, the button label is the only visual cue, and a
+    non-sighted reader got nothing at all.
+  */
+  // Worded as an ANNOUNCEMENT, deliberately not a copy of the visible
+  // card: a screen reader reaching the card will read it anyway, and
+  // repeating the sentence verbatim means hearing it twice.
+  const liveMessage = phase.kind === 'loading'
+    ? 'Checking public records.'
+    : report
+      ? `Report ready, with ${report.ask_before_you_sign.length} questions to ask.`
+      : result?.status === 'could_not_place'
+        ? 'Address not recognised. See the note below the form.'
+        : result?.status === 'unsupported_region'
+          ? 'Outside coverage. See the note below the form.'
+          : phase.kind === 'rate_limited'
+            ? 'Request limit reached. See the note below the form.'
+            : phase.kind === 'error'
+              ? 'Something went wrong. See the note below the form.'
+              : '';
+
+  const liveRegion = (
+    <p aria-live="polite" role="status" className="sr-only">{liveMessage}</p>
+  );
+
   if (report) {
     return (
       <PlaceShell active="scout">
+        {liveRegion}
         <ScoutView report={report} onNewSearch={() => setPhase({ kind: 'idle' })} />
       </PlaceShell>
     );
@@ -115,6 +146,7 @@ export default function Scout() {
 
   return (
     <PlaceShell active="scout">
+      {liveRegion}
       <div className="px-4 sm:px-5 pt-4 pb-16 max-w-[640px]">
         <div className="flex items-center gap-2.5">
           <span className="inline-flex items-center justify-center w-[34px] h-[34px] rounded-[11px] bg-app-home-bg text-app-home">
@@ -124,7 +156,7 @@ export default function Scout() {
         </div>
         <p className="mt-2.5 text-[14.5px] leading-[21px] text-app-text-secondary">
           Check an address you are considering, and get the questions worth asking before you commit — each one with
-          the public record that produced it.
+          the fact behind it, and a source where there is a public record to point at.
         </p>
 
         <form onSubmit={submit} className="mt-5">
@@ -175,7 +207,14 @@ export default function Scout() {
                 <option value="1">1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
-                <option value="4">4+</option>
+                {/*
+                  Labelled "4" rather than "4+": HUD publishes a 4-bedroom
+                  band and nothing above it, so picking this compares
+                  against a 4-bedroom band. Offering "4+" and then
+                  reporting the answer as a stated 4-bedroom overstated
+                  what the reader told us for every larger unit.
+                */}
+                <option value="4">4</option>
               </select>
             </div>
             <div>

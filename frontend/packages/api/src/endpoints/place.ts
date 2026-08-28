@@ -29,7 +29,13 @@ import type {
 // recurring/exact, so the client can render the locked cards + soft
 // wall. This mirrors backend/routes/public.js (GET /api/public/place).
 
-export type PlacePreviewStatus = 'ready' | 'partial' | 'unsupported_region';
+/**
+ * `could_not_place` and `unsupported_region` are DIFFERENT answers, and
+ * a client that renders them alike tells a US resident during a geocoder
+ * outage that the product is not for them. Only `unsupported_region`
+ * means the address resolved outside US coverage.
+ */
+export type PlacePreviewStatus = 'ready' | 'partial' | 'could_not_place' | 'unsupported_region';
 
 export interface PlacePreviewFlood {
   status: 'ready' | 'unavailable';

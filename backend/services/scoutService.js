@@ -303,7 +303,26 @@ async function getScoutReport(place, { askingRent, yearBuilt, bedrooms } = {}) {
   //
   // So Scout takes the numbers and lets askBeforeYouSign own every
   // sentence it emits. `summary` and `disclaimer` do not cross over.
-  const radonRaw = dataOf(radonSettled);
+  // The radon section ALSO accepts 'partial'.
+  //
+  // `composeLeadRadon` returns 'partial' when it has one of its two
+  // inputs rather than both — and the EPA county radon zone does not
+  // depend on the build year at all: it is a county fact we looked up.
+  // Dropping it because the reader could not state a year withheld an
+  // EPA Zone 1 classification on the one surface built for people about
+  // to sign, and made an "optional" form field effectively mandatory.
+  //
+  // Deliberately NOT done by loosening the shared `dataOf`: that is safe
+  // only by accident today, because composeDrinkingWater and
+  // composeRentBand happen never to emit 'partial'. Widening the shared
+  // helper would make Scout's wire contract depend on an unenforced
+  // property of two other composers.
+  const radonRaw = (() => {
+    if (radonSettled.status !== 'fulfilled') return null;
+    const [section] = radonSettled.value || [];
+    if (!section) return null;
+    return ['ready', 'stale', 'partial'].includes(section.status) ? section.data : null;
+  })();
   const waterRaw = dataOf(waterSettled);
   //
   // `year_built` is the CALLER's number, off a listing — it is not

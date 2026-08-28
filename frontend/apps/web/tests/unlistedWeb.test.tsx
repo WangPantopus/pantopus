@@ -499,3 +499,37 @@ describe('an address we could not place', () => {
     expect(screen.queryByText(/no substitute-address program/i)).not.toBeInTheDocument();
   });
 });
+
+
+// ── The preview's two non-ready answers, on /start ──────────
+//
+// /api/public/place is the highest-traffic anonymous surface, and it
+// collapsed every geocoder failure into the U.S.-only hand-off long
+// after the two sibling routes were split. During an outage that told
+// every US visitor at once that the product was not for them, and
+// offered nothing to do about it.
+describe('the start funnel distinguishes the two non-ready answers', () => {
+  it('an unreadable address offers a retry, not a geographic denial', async () => {
+    getPreview.mockResolvedValue({
+      status: 'could_not_place',
+      tier: 'preview',
+      region: null,
+      message: 'We could not find that address — try adding the city and state',
+    });
+    await runPreview();
+
+    expect(await screen.findByText(/couldn.t find that address/i)).toBeInTheDocument();
+    expect(screen.getByText(/adding the city and state/i)).toBeInTheDocument();
+    expect(screen.queryByText(/U\.S\.-only/i)).not.toBeInTheDocument();
+  });
+
+  it('a genuinely non-US address still gets the U.S.-only hand-off', async () => {
+    getPreview.mockResolvedValue({
+      status: 'unsupported_region', tier: 'preview', region: null, message: 'Home features are U.S.-only for now',
+    });
+    await runPreview();
+
+    expect(await screen.findByText(/U\.S\.-only for now/i)).toBeInTheDocument();
+    expect(screen.queryByText(/couldn.t find that address/i)).not.toBeInTheDocument();
+  });
+});

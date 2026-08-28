@@ -270,6 +270,57 @@ describe('the flood zone', () => {
   });
 });
 
+// ── Something must announce that anything happened ──────────
+
+describe('the fetch is announced', () => {
+  it('has a live region that exists BEFORE the state it reports', async () => {
+    // A live region mounted at the same moment its text appears is not
+    // announced by most screen readers, so it has to outlive the branch.
+    // Without one, the page between submit and answer looked and sounded
+    // unchanged: no skeleton, and the button label was the only cue.
+    render(<Scout />);
+    const region = document.querySelector('[aria-live="polite"]');
+    expect(region).not.toBeNull();
+    expect(region?.textContent).toBe('');
+  });
+
+  it('announces the result without re-reading the visible card', async () => {
+    getScoutReport.mockResolvedValue({ status: 'ready', scout: report() });
+    await runLookup();
+    await screen.findByText(/who pays for flood insurance/i);
+
+    const region = document.querySelector('[aria-live="polite"]');
+    expect(region?.textContent).toMatch(/report ready/i);
+    expect(region?.textContent).toMatch(/2 questions/);
+  });
+});
+
+// ── The page must not promise more than it delivers ─────────
+
+describe('the hero copy', () => {
+  it('does not claim every question carries a public record', async () => {
+    // `whats_changed` — the one question EVERY reader gets — has
+    // `source: null`. "each one with the public record that produced it"
+    // was therefore false for the only question guaranteed to be there.
+    render(<Scout />);
+    const hero = screen.getByText(/questions worth asking before you commit/i);
+    expect(hero.textContent).not.toMatch(/each one with the public record/i);
+    // What it may say: every ask does carry its reason.
+    expect(hero.textContent).toMatch(/the fact behind it/i);
+  });
+
+  it('offers no bedroom option it cannot honestly judge', async () => {
+    // "4+" collapsed "exactly 4" and "5 or more" into one value, then
+    // reported the answer back as a STATED 4-bedroom — overstating what
+    // the reader told us for every larger unit. HUD publishes no band
+    // above 4 bedrooms.
+    render(<Scout />);
+    const select = screen.getByLabelText(/bedrooms/i);
+    expect(within(select).queryByText('4+')).not.toBeInTheDocument();
+    expect(within(select).getByText('4')).toBeInTheDocument();
+  });
+});
+
 // ── The water system is a county guess, not a fact ──────────
 
 describe('the water system', () => {

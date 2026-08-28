@@ -58,12 +58,38 @@ async function timedFetch(url, opts = {}) {
     return res;
   } catch (err) {
     clearTimeout(timeout);
+    // ENDPOINT ONLY, NEVER THE QUERY STRING.
+    //
+    // `url.slice(0, 120)` looked harmless and was not: these URLs carry
+    // the exact coordinates as `?x=…&y=…`, well inside the first 120
+    // characters. So the coordinate meta fields elsewhere in this file
+    // were coarsened to ~110m while the log line beside them still
+    // printed the full-precision original.
+    //
+    // It matters because apm.js logs `user_id` for any request over
+    // 500ms, and a Scout report — which fans out to FEMA, the Census
+    // Bureau and the EPA — almost always is. The two lines land seconds
+    // apart in the same stream, and together they reconstruct "this
+    // account looked at this building".
+    const endpoint = safeEndpoint(url);
     if (err.name === 'AbortError') {
-      logger.warn('Neighborhood profile fetch timeout', { url: url.slice(0, 120) });
+      logger.warn('Neighborhood profile fetch timeout', { endpoint });
     } else {
-      logger.error('Neighborhood profile fetch error', { url: url.slice(0, 120), error: err.message });
+      logger.error('Neighborhood profile fetch error', { endpoint, error: err.message });
     }
     return null;
+  }
+}
+
+/** Host + path of a URL, with the query string dropped. */
+function safeEndpoint(url) {
+  try {
+    const u = new URL(String(url));
+    return `${u.host}${u.pathname}`;
+  } catch {
+    // Not parseable — return nothing rather than risk printing the raw
+    // string, which is the thing we are trying not to print.
+    return 'unparseable-url';
   }
 }
 

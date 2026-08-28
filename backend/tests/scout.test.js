@@ -432,6 +432,60 @@ describe('two addresses in one process are two different places', () => {
 // — test before renovating." Forwarded whole, that addressed a
 // non-resident as the occupant and issued an instruction, straight past
 // the rules two describe blocks up.
+// ── A county fact should not need the reader's homework ─────
+//
+// The EPA radon zone is a COUNTY lookup and does not depend on the build
+// year. But composeLeadRadon returns 'partial' when it has only one of
+// its two inputs, and Scout's shared `dataOf` accepts only ready/stale —
+// so a reader who could not state a year got no radon zone at all, even
+// in an EPA Zone 1 county, and the "optional" form field was effectively
+// mandatory on the one surface built for people about to sign.
+describe('the radon zone survives a missing build year', () => {
+  const { resetTables, seedTable } = require('./__mocks__/supabaseAdmin');
+  const scoutService = require('../services/scoutService');
+  const AUSTIN = { lat: 30.2672, lng: -97.7431, line: '1 Congress Ave', city: 'Austin', state: 'TX', zipcode: '78701' };
+
+  function censusOnly() {
+    return jest.fn(async (url) => {
+      if (String(url).includes('geocoding.geo.census.gov')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ result: { geographies: { 'Census Tracts': [{ STATE: '48', COUNTY: '453', TRACT: '001100' }] } } }),
+        };
+      }
+      return { ok: false, status: 503, json: async () => ({}) };
+    });
+  }
+
+  async function scoutAustin(opts) {
+    resetTables();
+    seedTable('CountyRadonZone', [{ county_fips: '48453', zone: 1 }]);
+    const realFetch = global.fetch;
+    global.fetch = censusOnly();
+    try {
+      return await scoutService.getScoutReport(AUSTIN, opts);
+    } finally {
+      global.fetch = realFetch;
+    }
+  }
+
+  test('a Zone 1 county raises the radon question with NO year supplied', async () => {
+    const report = await scoutAustin({});
+    expect(report.environment.radon).not.toBeNull();
+    expect(report.environment.radon.radon_zone).toBe(1);
+    // The assertion that matters is the QUESTION, not the field.
+    expect(report.ask_before_you_sign.map((a) => a.id)).toContain('radon_tested');
+  });
+
+  test('supplying a year still works, and adds the lead question', async () => {
+    const report = await scoutAustin({ yearBuilt: 1961 });
+    const ids = report.ask_before_you_sign.map((a) => a.id);
+    expect(ids).toContain('radon_tested');
+    expect(ids).toContain('lead_disclosure');
+  });
+});
+
 describe('nothing in the report speaks to the reader as a resident', () => {
   const { resetTables, seedTable } = require('./__mocks__/supabaseAdmin');
   const scoutService = require('../services/scoutService');
@@ -665,5 +719,98 @@ describe('the rent verdict is tied to a stated unit size', () => {
     expect(ask.because).toMatch(/studios/i);
     // And must not silently imply the default.
     expect(ask.because).not.toMatch(/2-bedroom/i);
+  });
+});
+
+// ── The route hands the service the unit size the reader chose ──
+//
+// `bedroomCount` had exactly one call site and no test. Swapping it for
+// `positiveNumber` — which rejects 0 — reinstates this wave's own bug in
+// one character: a studio silently becomes "not stated", the band
+// defaults to 2-bedroom, and the verdict is about a unit twice the size
+// of the one the reader is standing in.
+describe('the route coerces the bedroom count itself', () => {
+  const publicRoutes = require('../routes/public');
+  const scoutService = require('../services/scoutService');
+
+  function buildApp2() {
+    const app = express();
+    app.use(express.json());
+    app.use('/api/scout', require('../routes/scout'));
+    return app;
+  }
+
+  async function optsFor(query) {
+    const spyGeo = jest.spyOn(publicRoutes, 'geocodeUsAddress').mockResolvedValue({
+      ok: true, lat: 30.2672, lng: -97.7431, line: '1 Congress Ave', city: 'Austin', state: 'TX', zipcode: '78701',
+    });
+    const spyScout = jest.spyOn(scoutService, 'getScoutReport').mockResolvedValue({
+      place: {}, flood: null, flood_cost: null, environment: { radon: null, water: null },
+      rent: null, ask_before_you_sign: [], scope_note: 'x',
+    });
+    try {
+      await request(buildApp2()).get('/api/scout').set('x-test-user-id', 'u1').query(query);
+      return spyScout.mock.calls[0][1];
+    } finally {
+      spyGeo.mockRestore();
+      spyScout.mockRestore();
+    }
+  }
+
+  test('a STUDIO (0) reaches the service as 0, not as "not stated"', async () => {
+    const opts = await optsFor({ address: 'x', bedrooms: '0' });
+    expect(opts.bedrooms).toBe(0);
+  });
+
+  test('an ordinary count passes through', async () => {
+    expect((await optsFor({ address: 'x', bedrooms: '3' })).bedrooms).toBe(3);
+  });
+
+  test('junk, negatives and out-of-range values become undefined, not a wrong band', async () => {
+    // HUD publishes bands for 0-4 only, so anything else must be absent
+    // rather than clamped into a band the reader did not choose.
+    for (const v of ['abc', '-1', '9', '']) {
+      const opts = await optsFor({ address: 'x', bedrooms: v });
+      expect({ v, bedrooms: opts.bedrooms }).toEqual({ v, bedrooms: undefined });
+    }
+  });
+});
+
+// ── The SFHA classifier is wired to the thing that uses it ──
+//
+// Every flood test above drives the exported helper directly, so
+// mutating the PRODUCTION call site — the one line that decides what a
+// reader is actually told — left the whole suite green.
+describe('the report itself classifies the zone', () => {
+  const { resetTables } = require('./__mocks__/supabaseAdmin');
+  const scoutService = require('../services/scoutService');
+  const neighborhood = require('../services/ai/neighborhoodProfileService');
+  const PLACE = { lat: 30.2672, lng: -97.7431, line: '1 Congress Ave', city: 'Austin', state: 'TX', zipcode: '78701' };
+
+  async function reportForZone(zone) {
+    resetTables();
+    const spy = jest.spyOn(neighborhood, 'fetchFloodZone').mockResolvedValue({ flood_zone: zone });
+    const realFetch = global.fetch;
+    global.fetch = jest.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }));
+    try {
+      return await scoutService.getScoutReport(PLACE, {});
+    } finally {
+      spy.mockRestore();
+      global.fetch = realFetch;
+    }
+  }
+
+  test('an unmapped zone reaches the payload as undetermined, not high-risk', async () => {
+    const report = await reportForZone('AREA NOT INCLUDED');
+    expect(report.flood.in_sfha).toBe(false);
+    expect(report.flood.determination).toBe('undetermined');
+    expect(report.ask_before_you_sign.map((a) => a.id)).toContain('flood_undetermined');
+  });
+
+  test('a real SFHA reaches the payload as high-risk', async () => {
+    const report = await reportForZone('AE');
+    expect(report.flood.in_sfha).toBe(true);
+    expect(report.flood.determination).toBe('high_risk');
+    expect(report.ask_before_you_sign.map((a) => a.id)).toContain('flood_insurance_required');
   });
 });

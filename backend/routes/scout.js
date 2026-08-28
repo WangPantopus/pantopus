@@ -44,7 +44,12 @@ function positiveNumber(value) {
 // one they are standing in. Capped at 4 because that is the width of
 // HUD's fmr_lo/fmr_hi arrays.
 function bedroomCount(value) {
-  const n = Number(value);
+  // `Number('')` is 0, and 0 is a STUDIO — so an empty or missing param
+  // silently became a stated studio, and `bedrooms_stated: true` told the
+  // reader we had judged the unit size they gave us when they gave us
+  // nothing. Absence has to stay absent.
+  if (typeof value !== 'string' || value.trim() === '') return undefined;
+  const n = Number(value.trim());
   return Number.isFinite(n) && n >= 0 && n <= 4 ? Math.round(n) : undefined;
 }
 

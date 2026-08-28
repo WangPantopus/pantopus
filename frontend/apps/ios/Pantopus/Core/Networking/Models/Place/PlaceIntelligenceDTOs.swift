@@ -1505,6 +1505,10 @@ public struct PlaceIntelligence: Decodable, Sendable, Hashable {
 public enum PlacePreviewStatus: String, Sendable, Hashable {
     case ready
     case partial
+    /// We could not read an address out of what was typed. NOT the same
+    /// as `unsupportedRegion` — rendering the two alike told every US
+    /// visitor during a geocoder outage that the product was not for them.
+    case couldNotPlace = "could_not_place"
     case unsupportedRegion = "unsupported_region"
     case unknown
 }

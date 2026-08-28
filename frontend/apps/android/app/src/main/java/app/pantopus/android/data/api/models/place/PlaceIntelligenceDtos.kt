@@ -1181,6 +1181,14 @@ enum class PlacePreviewStatus {
     @Json(name = "partial")
     PARTIAL,
 
+    /**
+     * We could not read an address out of what was typed. NOT the same as
+     * [UNSUPPORTED_REGION] — rendering the two alike told every US visitor
+     * during a geocoder outage that the product was not for them.
+     */
+    @Json(name = "could_not_place")
+    COULD_NOT_PLACE,
+
     @Json(name = "unsupported_region")
     UNSUPPORTED_REGION,
     UNKNOWN,

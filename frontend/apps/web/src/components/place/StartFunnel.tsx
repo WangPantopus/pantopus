@@ -390,6 +390,31 @@ function PreviewSkeleton() {
 }
 
 // ── Unsupported region (non-US) ─────────────────────────────
+/**
+ * "We could not read that address" — NOT the geographic denial below.
+ *
+ * `geocodeUsAddress` fails four ways and only one means "outside the US".
+ * Collapsing them showed a US visitor the U.S.-only hand-off during any
+ * geocoder outage, and offered them nothing to do about it. The retry is
+ * the point: adding a city and state usually resolves it.
+ */
+function CouldNotPlace({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="mt-10 flex flex-col items-center text-center px-2">
+      <span className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-app-surface-sunken text-app-text-muted mb-5">
+        <MapPinned size={30} strokeWidth={2} />
+      </span>
+      <h2 className="text-xl font-bold -tracking-[0.02em] text-app-text">We couldn&apos;t find that address</h2>
+      <p className="mt-2 text-sm text-app-text-secondary leading-relaxed max-w-sm">
+        Adding the city and state usually does it — &ldquo;1421 SE Oak St, Portland, OR&rdquo;.
+      </p>
+      <div className="mt-5">
+        <TextButton arrow={false} onClick={onRetry}>Try another address</TextButton>
+      </div>
+    </div>
+  );
+}
+
 function UnsupportedRegion({ onBrowse }: { onBrowse: () => void }) {
   return (
     <div className="mt-10 flex flex-col items-center text-center px-2">
@@ -477,6 +502,8 @@ export default function StartFunnel() {
               <TextButton arrow={false} onClick={() => previewQuery.refetch()}>Try again</TextButton>
             </div>
           </div>
+        ) : preview && preview.status === 'could_not_place' ? (
+          <CouldNotPlace onRetry={() => { setSelected(null); setSubmitted(null); }} />
         ) : preview && preview.status === 'unsupported_region' ? (
           <UnsupportedRegion onBrowse={goBrowse} />
         ) : preview ? (

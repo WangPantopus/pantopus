@@ -485,6 +485,11 @@ async function readDensityBucket(geohash) {
 
 router.get('/place', async (req, res) => {
   try {
+    // Same reason as /unlisted: a 200 with an ETag and no Cache-Control is
+    // storable, and the cache key is the full URL — which on this route
+    // carries the address someone typed, into their own disk cache.
+    res.set('Cache-Control', 'no-store');
+
     const rawAddress = typeof req.query.address === 'string' ? req.query.address.trim() : '';
     if (!rawAddress) {
       return res.status(400).json({ error: 'An address query parameter is required.' });
@@ -493,14 +498,25 @@ router.get('/place', async (req, res) => {
       return res.status(400).json({ error: 'That address is too long.' });
     }
 
-    // 1. Geocode (services/geo, US-only). Non-US / ungeocodable → calm hand-off.
+    // 1. Geocode (services/geo, US-only).
+    //
+    // BRANCH ON THE REASON. `geocodeUsAddress` fails four ways and only
+    // one of them means "not in the United States" — the contract this
+    // file documents at the helper itself. /api/public/unlisted and
+    // /api/scout were both split; this route, the highest-traffic
+    // anonymous surface in the product, was left collapsing them, so a
+    // geocoder outage still tells every US visitor at once that the
+    // product is not for them.
     const place = await geocodeUsAddress(rawAddress);
     if (!place.ok) {
+      const unplaceable = place.reason !== 'outside_us';
       return res.json({
-        status: 'unsupported_region',
+        status: unplaceable ? 'could_not_place' : 'unsupported_region',
         tier: 'preview',
-        region: null,
-        message: 'Home features are U.S.-only for now',
+        region: unplaceable ? null : null,
+        message: unplaceable
+          ? 'We could not find that address — try adding the city and state'
+          : 'Home features are U.S.-only for now',
       });
     }
 

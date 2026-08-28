@@ -258,22 +258,84 @@ describe('removal progress', () => {
   });
 
   test('a failed PERMISSION read is a 500, not "you do not have access"', async () => {
-    // The companion half. checkHomePermission read Home with `.single()`
-    // and dropped its error, so a full outage never reached the route's
-    // own read — it returned 403 "You do not have access to this place."
-    // to a resident about their own home, which is the more alarming of
-    // the two wrong answers and is not auto-retried by either client.
-    seedHome();
-    const spy = failHomeTerminal('single');
+    // Tested against checkHomePermission DIRECTLY, not through the route:
+    // both it and the route now read Home with `maybeSingle`, so failing
+    // that terminal can no longer tell the two reads apart. Driving the
+    // helper is also the more precise assertion — the claim is about what
+    // the helper returns, and the route's mapping of it is a separate
+    // line already covered above.
+    const { checkHomePermission } = require('../utils/homePermissions');
+    const supabaseAdmin = require('../config/supabaseAdmin');
+    const realFrom = supabaseAdmin.from.bind(supabaseAdmin);
+    const wrap = (b) => new Proxy(b, {
+      get(t, prop, recv) {
+        if (prop === 'maybeSingle') {
+          return async () => ({ data: null, error: { message: 'connection reset' } });
+        }
+        const value = Reflect.get(t, prop, recv);
+        if (typeof value !== 'function') return value;
+        return (...args) => {
+          const out = value.apply(t, args);
+          return out === t ? wrap(t) : out;
+        };
+      },
+    });
+    const spy = jest.spyOn(supabaseAdmin, 'from')
+      .mockImplementation((table) => (table === 'Home' ? wrap(realFrom(table)) : realFrom(table)));
+
     try {
-      const res = await request(buildApp())
-        .get(`/api/homes/${HOME_ID}/unlisted`)
-        .set('x-test-user-id', USER);
-      expect(res.status).toBe(500);
-      expect(JSON.stringify(res.body)).not.toMatch(/do not have access/i);
+      seedHome();
+      const access = await checkHomePermission(HOME_ID, USER);
+      // "We could not check" — distinct from a decision to deny.
+      expect(access.readFailed).toBe(true);
+      expect(access.hasAccess).toBe(false);
     } finally {
       spy.mockRestore();
     }
+  });
+
+  test('PGRST116 — "zero rows" — is not treated as a database failure', async () => {
+    // Real PostgREST signals zero rows from `.single()` as an ERROR with
+    // this code; the in-memory mock does not, which is why switching the
+    // read back to `.single()` does NOT fail the test below. This one
+    // models the real semantics directly, so the guard is defended
+    // whichever terminal a future edit picks.
+    const { checkHomePermission } = require('../utils/homePermissions');
+    const supabaseAdmin = require('../config/supabaseAdmin');
+    const realFrom = supabaseAdmin.from.bind(supabaseAdmin);
+    const wrap = (b) => new Proxy(b, {
+      get(t, prop, recv) {
+        if (prop === 'maybeSingle' || prop === 'single') {
+          return async () => ({ data: null, error: { code: 'PGRST116', message: 'no rows' } });
+        }
+        const value = Reflect.get(t, prop, recv);
+        if (typeof value !== 'function') return value;
+        return (...args) => {
+          const out = value.apply(t, args);
+          return out === t ? wrap(t) : out;
+        };
+      },
+    });
+    const spy = jest.spyOn(supabaseAdmin, 'from')
+      .mockImplementation((table) => (table === 'Home' ? wrap(realFrom(table)) : realFrom(table)));
+    try {
+      const access = await checkHomePermission(HOME_ID, USER);
+      expect(access.readFailed).toBeFalsy();
+      expect(access.hasAccess).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('a home that genuinely does not exist is NOT a read failure', async () => {
+    // The regression this wave introduced while fixing the opposite bug:
+    // `.single()` signals zero rows as an ERROR (PGRST116), so the
+    // readFailed guard turned an ordinary "no such home" into a database
+    // failure — a 500 where a 403/404 belongs, on every absent id.
+    const { checkHomePermission } = require('../utils/homePermissions');
+    const access = await checkHomePermission('home-that-does-not-exist', USER);
+    expect(access.readFailed).toBeFalsy();
+    expect(access.hasAccess).toBe(false);
   });
 
   test('a genuinely absent home is still a 404', async () => {

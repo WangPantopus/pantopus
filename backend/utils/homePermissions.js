@@ -153,11 +153,19 @@ async function getUserAccess(homeId, userId) {
  */
 async function checkHomePermission(homeId, userId, permission = null) {
   // Check ownership
+  // `.maybeSingle()`, NOT `.single()`.
+  //
+  // `.single()` signals "zero rows" as an ERROR (PGRST116), so the
+  // readFailed guard below turned "this home does not exist" — an
+  // ordinary 404/403 — into a database-failure 500. That is a regression
+  // this same wave introduced while fixing the opposite problem, and it
+  // is the reason to prefer maybeSingle: it puts "no row" in `data` and
+  // reserves `error` for things that actually went wrong.
   const { data: home, error: homeError } = await supabaseAdmin
     .from('Home')
     .select('owner_id')
     .eq('id', homeId)
-    .single();
+    .maybeSingle();
 
   // A DATABASE FAILURE IS NOT A PERMISSION DECISION.
   //
@@ -172,7 +180,12 @@ async function checkHomePermission(homeId, userId, permission = null) {
   // that can distinguish should return 500 rather than 403, which is also
   // what gets the request auto-retried by the native clients instead of
   // parked behind a manual Try again.
-  if (homeError) {
+  // PGRST116 is `.single()`'s "zero rows" signal, not a failure. The read
+  // above uses maybeSingle so it should never appear — this is belt and
+  // braces for the next person who switches it back, because the cost of
+  // getting it wrong is a 500 on every request for a home that simply
+  // does not exist.
+  if (homeError && homeError.code !== 'PGRST116') {
     logger.error('homePermissions: home read failed', { homeId, userId, error: homeError.message });
     return {
       hasAccess: false, isOwner: false, occupancy: null, permissions: [], readFailed: true,
