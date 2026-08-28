@@ -148,9 +148,15 @@ function HeroStep({
           place to save. Routing them by INTENT rather than dropping them
           into the claim flow is also the only way to find out whether
           that intent exists — never carry the typed address in the URL.
+
+          `redirectTo`, NOT `intent`: the register page reads redirectTo
+          (via readAuthRedirectQuery) and nothing anywhere reads `intent`,
+          so the first version of this link dropped the shopper into the
+          default /app/place claim flow — the exact funnel it exists to
+          route around.
         */}
         <Link
-          href="/register?intent=scout"
+          href="/register?redirectTo=%2Fapp%2Fplace%2Fscout"
           className="inline-flex items-center gap-1.5 py-2 px-1 text-[13.5px] font-medium text-app-text-secondary -tracking-[0.005em]"
         >
           Considering a place you don&apos;t live at yet?

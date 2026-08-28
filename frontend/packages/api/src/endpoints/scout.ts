@@ -50,10 +50,19 @@ export interface ScoutPlace {
 }
 
 export interface ScoutFlood {
-  /** FEMA zone code, e.g. "AE", "X". */
+  /** FEMA zone code, e.g. "AE", "X", "D", "AREA NOT INCLUDED". */
   zone: string;
   /** Special Flood Hazard Area — where a federally backed mortgage requires cover. */
   in_sfha: boolean;
+  /**
+   * FEMA'S ANSWER HAS THREE VALUES. Branch on this, never on `in_sfha`
+   * alone: `in_sfha: false` covers both "FEMA looked and it is low risk"
+   * AND "FEMA has made no determination here" (zone D, unmapped areas,
+   * open water). Rendering the boolean as two branches says "outside the
+   * high-risk area" about land nobody has assessed — a confident safety
+   * claim for exactly the places where no one can make one.
+   */
+  determination: 'high_risk' | 'low_risk' | 'undetermined';
 }
 
 /**

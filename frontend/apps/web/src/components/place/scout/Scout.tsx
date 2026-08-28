@@ -49,10 +49,19 @@ function isRateLimited(err: unknown): boolean {
   return e.statusCode === 429 || e.code === 'AI_RATE_LIMITED';
 }
 
+/**
+ * Accept what people actually type.
+ *
+ * `Number('2,400')` is NaN — and "2,400" is the exact format the asking-
+ * rent placeholder demonstrates, so the field silently discarded the
+ * value it had just asked for. The rent section then never rendered and
+ * the reader had no way to know why. Currency symbols and spaces go the
+ * same way. `0` must survive, because a studio is 0 bedrooms.
+ */
 function numberOrUndefined(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  const n = Number(trimmed);
+  const cleaned = value.replace(/[$,\s]/g, '');
+  if (!cleaned) return undefined;
+  const n = Number(cleaned);
   return Number.isFinite(n) ? n : undefined;
 }
 

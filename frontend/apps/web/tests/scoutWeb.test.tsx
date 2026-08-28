@@ -48,7 +48,7 @@ const ADDRESS = '1421 SE Oak St, Portland, OR';
 
 const FULL: ScoutReport = {
   place: { address: '1421 SE Oak St', city: 'Portland', state: 'OR', zipcode: '97214' },
-  flood: { zone: 'AE', in_sfha: true },
+  flood: { zone: 'AE', in_sfha: true, determination: 'high_risk' },
   flood_cost: {
     premium_p25: 480,
     premium_median: 760,
@@ -181,6 +181,92 @@ describe('the question list', () => {
     // The sibling row DOES have a source, so this is a real distinction.
     const sourced = (await screen.findByText(/who pays for flood insurance/i)).closest('li') as HTMLElement;
     expect(within(sourced).getByText('FEMA National Flood Hazard Layer')).toBeInTheDocument();
+  });
+});
+
+// ── The form must accept what it asks for ───────────────────
+
+describe('the optional numeric fields', () => {
+  it('accepts the asking rent in the format the placeholder demonstrates', async () => {
+    // `Number('2,400')` is NaN, and "2,400" is literally what the
+    // placeholder shows. The value was dropped from the request, the rent
+    // section never rendered, and nothing told the reader why.
+    getScoutReport.mockResolvedValue({ status: 'ready', scout: report() });
+    render(<Scout />);
+    fireEvent.change(screen.getByLabelText(/the address you are considering/i), { target: { value: ADDRESS } });
+    fireEvent.change(screen.getByLabelText(/asking rent/i), { target: { value: '2,400' } });
+    fireEvent.change(screen.getByLabelText(/bedrooms/i), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: /show me what to ask/i }));
+
+    await waitFor(() => expect(getScoutReport).toHaveBeenCalled());
+    const [, opts] = getScoutReport.mock.calls[0];
+    // The assertion is on what was SENT — a render assertion would pass
+    // off the mocked response regardless of what the form did.
+    expect(opts.askingRent).toBe(2400);
+    // And 0 bedrooms must survive: a studio is a real answer.
+    expect(opts.bedrooms).toBe(0);
+  });
+
+  it('sends nothing for a field left blank rather than a zero', async () => {
+    getScoutReport.mockResolvedValue({ status: 'ready', scout: report() });
+    await runLookup();
+    await waitFor(() => expect(getScoutReport).toHaveBeenCalled());
+    const [address, opts] = getScoutReport.mock.calls[0];
+    expect(address).toBe(ADDRESS);
+    expect(opts.askingRent).toBeUndefined();
+    expect(opts.yearBuilt).toBeUndefined();
+    expect(opts.bedrooms).toBeUndefined();
+  });
+});
+
+// ── The flood zone has THREE answers ────────────────────────
+//
+// `in_sfha: false` covers both "FEMA looked and this is outside the
+// floodplain" and "FEMA has made no determination here". Rendering the
+// boolean as two branches said "Outside the high-risk area" about land
+// nobody has assessed — the same defect the backend fixed for
+// "AREA NOT INCLUDED", reintroduced in this client, and in the
+// reassuring direction, which is the more dangerous one.
+
+describe('the flood zone', () => {
+  it('a high-risk zone states the insurance requirement', async () => {
+    getScoutReport.mockResolvedValue({ status: 'ready', scout: report() });
+    await runLookup();
+    expect(await screen.findByText(/federally backed mortgage requires flood insurance here/i)).toBeInTheDocument();
+  });
+
+  it('an UNMAPPED zone is never called low risk', async () => {
+    getScoutReport.mockResolvedValue({
+      status: 'ready',
+      scout: report({ flood: { zone: 'AREA NOT INCLUDED', in_sfha: false, determination: 'undetermined' } }),
+    });
+    await runLookup();
+
+    expect(await screen.findByText(/has not published a flood-risk finding/i)).toBeInTheDocument();
+    expect(screen.getByText(/not the same as low risk/i)).toBeInTheDocument();
+    // The reassurance that must never appear for an unassessed location.
+    expect(screen.queryByText(/outside the high-risk area/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/usually optional/i)).not.toBeInTheDocument();
+  });
+
+  it('zone D — undetermined — gets the same treatment as unmapped', async () => {
+    getScoutReport.mockResolvedValue({
+      status: 'ready',
+      scout: report({ flood: { zone: 'D', in_sfha: false, determination: 'undetermined' } }),
+    });
+    await runLookup();
+    expect(await screen.findByText(/has not published a flood-risk finding/i)).toBeInTheDocument();
+    expect(screen.queryByText(/outside the high-risk area/i)).not.toBeInTheDocument();
+  });
+
+  it('a genuine low-risk zone still says so', async () => {
+    // The three-way split must not swallow the real low-risk answer.
+    getScoutReport.mockResolvedValue({
+      status: 'ready',
+      scout: report({ flood: { zone: 'X', in_sfha: false, determination: 'low_risk' } }),
+    });
+    await runLookup();
+    expect(await screen.findByText(/outside the high-risk area/i)).toBeInTheDocument();
   });
 });
 

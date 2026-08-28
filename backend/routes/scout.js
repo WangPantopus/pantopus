@@ -51,6 +51,17 @@ function bedroomCount(value) {
 // GET /api/scout — the report for an address you are considering
 router.get('/', verifyToken, aiDraftLimiter, async (req, res) => {
   try {
+    // NOT CACHEABLE — this is about the reader's own device, not ours.
+    //
+    // Express sends a 200 JSON body with an ETag and no Cache-Control,
+    // which is storable, so the browser (and OkHttp's Cache, and iOS's
+    // URLCache) writes an entry KEYED ON THE FULL URL — which here
+    // carries the address someone typed. /api/public/unlisted got this
+    // header in the same wave for exactly this reason; Scout is the
+    // surface whose whole promise is discretion about a place you have
+    // not committed to, and it was left out.
+    res.set('Cache-Control', 'no-store');
+
     const rawAddress = typeof req.query.address === 'string' ? req.query.address.trim() : '';
     if (!rawAddress) {
       return res.status(400).json({ error: 'An address query parameter is required.' });

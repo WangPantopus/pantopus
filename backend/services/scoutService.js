@@ -72,6 +72,33 @@ function isSpecialFloodHazardArea(zone) {
 }
 
 /**
+ * FEMA's answer has THREE values, not two, and the third is the one that
+ * keeps getting lost.
+ *
+ *   'high_risk'    — the 1%-annual-chance floodplain. Insurance required
+ *                    with a federally backed mortgage.
+ *   'low_risk'     — FEMA looked and it is outside that floodplain.
+ *   'undetermined' — FEMA has NOT made a determination here: zone D, an
+ *                    unmapped area, open water, or a code we do not know.
+ *
+ * `in_sfha: false` collapses the last two, and every client that renders
+ * a boolean then says "outside the high-risk area" about land nobody has
+ * assessed — a confident safety claim, made for exactly the places where
+ * no one can make it. That is the same defect as the AREA-NOT-INCLUDED
+ * bug this file already fixed, one layer up, so the determination is
+ * resolved HERE rather than re-derived by three clients.
+ */
+function floodDetermination(zone) {
+  const z = String(zone || '').trim().toUpperCase();
+  if (isSpecialFloodHazardArea(z)) return 'high_risk';
+  // The zones that ARE a finding of lower risk. X500 and "SHADED X" are
+  // the 0.2%-chance band; B and C are their pre-1986 equivalents.
+  if (/^(X|X500|B|C|SHADED X|AREA OF MINIMAL FLOOD HAZARD)$/.test(z)) return 'low_risk';
+  // D, AREA NOT INCLUDED, OPEN WATER, and anything unrecognised.
+  return 'undetermined';
+}
+
+/**
  * How to name a HUD bedroom band in prose.
  *
  * Never omit it. `rent.position` is the single personalised judgement in
@@ -84,6 +111,19 @@ function bedroomsLabel(bedrooms) {
   if (bedrooms == null) return 'units of an unstated size';
   if (bedrooms === 0) return 'studios';
   return `${bedrooms}-bedroom units`;
+}
+
+/**
+ * The determination for a flood object, derived when it is missing.
+ *
+ * Callers build this object in several places, and one that omits
+ * `determination` must not silently fall through to the "outside the
+ * high-risk zone" branch — that is the false-reassurance bug, reachable
+ * by nothing more than forgetting a field. Deriving from the zone means
+ * there is exactly one way to be right.
+ */
+function determinationOf(flood) {
+  return flood.determination || floodDetermination(flood.zone);
 }
 
 /**
@@ -111,6 +151,19 @@ function askBeforeYouSign({ flood, nfip, radon, water, rentBand, askingRent }) {
         source: 'FEMA · OpenFEMA NFIP policies',
       });
     }
+  } else if (flood && flood.zone && determinationOf(flood) === 'undetermined') {
+    // FEMA has NOT assessed here — zone D, an unmapped area, or a code we
+    // do not know. "Outside the high-risk zone" is as false for this as
+    // "requires flood insurance" was, and it is the more tempting error
+    // because it sounds like reassurance. The honest answer is that
+    // nobody has made a finding, which makes the history question MORE
+    // worth asking, not less.
+    asks.push({
+      id: 'flood_undetermined',
+      question: 'Has this property ever flooded, and has anyone assessed its flood risk?',
+      because: `FEMA has not made a flood-risk determination for this location (zone ${flood.zone}). That is not the same as low risk — it means no one has published a finding either way, so the building's own history is the best evidence available.`,
+      source: 'FEMA National Flood Hazard Layer',
+    });
   } else if (flood && flood.zone) {
     asks.push({
       id: 'flood_history',
@@ -298,6 +351,10 @@ async function getScoutReport(place, { askingRent, yearBuilt, bedrooms } = {}) {
       flood = {
         zone: rawZone,
         in_sfha: isSpecialFloodHazardArea(zone),
+        // Kept alongside `in_sfha` rather than replacing it: the boolean
+        // still drives the question generator, but a client rendering
+        // prose must branch on all three answers. See floodDetermination.
+        determination: floodDetermination(zone),
         plain_meaning: (zoneRow && (zoneRow.flood_zone_description || zoneRow.description)) || null,
       };
     }
@@ -413,5 +470,6 @@ module.exports = {
   // Exported for testing.
   askBeforeYouSign,
   isSpecialFloodHazardArea,
+  floodDetermination,
   LEAD_DISCLOSURE_YEAR,
 };

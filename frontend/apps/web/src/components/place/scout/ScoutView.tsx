@@ -24,6 +24,26 @@ import {
   AskRow, BandTrack, Card, FactRow, RentVerdict, ScopeNote, SectionLabel, money,
 } from './parts';
 
+/**
+ * THREE ANSWERS, NOT TWO. `in_sfha: false` means either "FEMA looked and
+ * this is outside the floodplain" or "FEMA has made no determination
+ * here" — and rendering the boolean as two branches turned the second
+ * into "Outside the high-risk area", a reassurance about land nobody has
+ * assessed. That is the same defect the backend fixed for
+ * "AREA NOT INCLUDED", reintroduced one layer up, and the reassuring
+ * direction is the more dangerous one to get wrong.
+ *
+ * An unrecognised value falls to `undetermined`, which claims nothing.
+ */
+const FLOOD_MEANING: Record<string, string> = {
+  high_risk: 'A Special Flood Hazard Area — a federally backed mortgage requires flood insurance here.',
+  low_risk:
+    'Outside the high-risk area, where flood insurance is usually optional — which also means it is often absent.',
+  undetermined:
+    'FEMA has not published a flood-risk finding for this location. That is not the same as low risk — it means '
+    + 'nobody has assessed it either way.',
+};
+
 const RADON_ZONE_NOTE: Record<number, string> = {
   1: 'Highest predicted indoor level',
   2: 'Moderate predicted level',
@@ -96,9 +116,7 @@ export default function ScoutView({ report, onNewSearch }: { report: ScoutReport
                 <div className="min-w-0">
                   <p className="text-[15px] font-semibold text-app-text">FEMA zone {flood.zone}</p>
                   <p className="text-[13px] leading-[19px] text-app-text-secondary mt-1">
-                    {flood.in_sfha
-                      ? 'A Special Flood Hazard Area — a federally backed mortgage requires flood insurance here.'
-                      : 'Outside the high-risk area, where flood insurance is usually optional — which also means it is often absent.'}
+                    {FLOOD_MEANING[flood.determination] ?? FLOOD_MEANING.undetermined}
                   </p>
                 </div>
               </div>

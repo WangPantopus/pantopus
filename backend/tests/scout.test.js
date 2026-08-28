@@ -136,14 +136,45 @@ describe('the flood-zone classification', () => {
     }
   });
 
-  test('an unmapped area never generates the insurance-is-required question', () => {
+  test('an unmapped area gets neither false sentence, and says nobody assessed it', () => {
+    // The FIRST version of this test only asserted the absence of
+    // "requires flood insurance" — and passed, while the payload it built
+    // contained the OPPOSITE falsehood: "The address is outside the
+    // high-risk zone (AREA NOT INCLUDED)". Reassurance is the more
+    // tempting error and the easier one to miss, so it is asserted here
+    // explicitly, along with the positive content that replaces it.
     const asks = askBeforeYouSign({
       flood: { zone: 'AREA NOT INCLUDED', in_sfha: isSpecialFloodHazardArea('AREA NOT INCLUDED') },
     });
     const ids = asks.map((a) => a.id);
+    const text = asks.map((a) => `${a.question} ${a.because}`).join(' ');
+
     expect(ids).not.toContain('flood_insurance_required');
-    const text = asks.map((a) => a.because).join(' ');
     expect(text).not.toMatch(/requires flood insurance/i);
+    // The false-reassurance half.
+    expect(ids).not.toContain('flood_history');
+    expect(text).not.toMatch(/outside the high-risk/i);
+    expect(text).not.toMatch(/usually optional/i);
+
+    // And what it must say instead.
+    expect(ids).toContain('flood_undetermined');
+    expect(text).toMatch(/has not made a flood-risk determination/i);
+    expect(text).toMatch(/not the same as low risk/i);
+  });
+
+  test('zone D — "undetermined" — is not dressed as low risk either', () => {
+    // D is FEMA explicitly declining to make a finding. It reads like an
+    // ordinary letter zone and is the easiest to lump in with X.
+    const asks = askBeforeYouSign({ flood: { zone: 'D', in_sfha: false } });
+    expect(asks.map((a) => a.id)).toContain('flood_undetermined');
+    expect(asks.map((a) => a.because).join(' ')).not.toMatch(/outside the high-risk/i);
+  });
+
+  test('a genuine low-risk zone still gets the ordinary history question', () => {
+    // The three-way split must not swallow the real low-risk answer.
+    const asks = askBeforeYouSign({ flood: { zone: 'X', in_sfha: false } });
+    expect(asks.map((a) => a.id)).toContain('flood_history');
+    expect(asks.map((a) => a.id)).not.toContain('flood_undetermined');
   });
 });
 
@@ -487,6 +518,23 @@ describe('the route distinguishes "could not place" from "not in the US"', () =>
     expect(res.body.message).not.toMatch(/U\.S\.-only/i);
     // And it must say what would help, since a fuller address often works.
     expect(res.body.message).toMatch(/city and state/i);
+  });
+
+  test('the report is not storable on the reader\'s own device', async () => {
+    // Express sends 200 + ETag + no Cache-Control, which is storable, and
+    // the cache key is the full URL — which on this route carries the
+    // typed address. /api/public/unlisted got this header in the same
+    // wave; Scout, the surface whose entire promise is discretion about
+    // a place you have not committed to, was left out.
+    jest.spyOn(publicRoutes, 'geocodeUsAddress')
+      .mockResolvedValue({ ok: false, reason: 'unplaceable' });
+
+    const res = await request(buildScoutApp())
+      .get('/api/scout')
+      .set('x-test-user-id', 'scout-user-1')
+      .query({ address: '1421 SE Oak St' });
+
+    expect(res.headers['cache-control']).toMatch(/no-store/);
   });
 
   test('an address genuinely outside the US still gets the geographic answer', async () => {
