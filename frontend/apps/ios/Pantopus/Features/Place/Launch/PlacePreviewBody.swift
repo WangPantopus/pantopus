@@ -94,6 +94,18 @@ struct PlacePreviewBody: View {
         .padding(.bottom, 4)
     }
 
+    /// "FEMA · OpenFEMA NFIP policies · census tract-level, not this home"
+    ///
+    /// Mirrors the web footer. Either half may be absent, so the parts are
+    /// joined rather than formatted into a fixed template — an empty
+    /// source must not leave a leading separator.
+    private func scopeFooter(_ lead: PlaceMoneyLead) -> String {
+        var parts: [String] = []
+        if !lead.source.isEmpty { parts.append(lead.source) }
+        if !lead.scope.isEmpty { parts.append("\(lead.scope)-level, not this home") }
+        return parts.joined(separator: " · ")
+    }
+
     /// The lead figure. `detail` and `source` are the server's own words
     /// and are rendered whole: between them they say what the number is
     /// measured over and that it is a benchmark, not a quote. Dropping
@@ -120,10 +132,21 @@ struct PlacePreviewBody: View {
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if !lead.source.isEmpty {
-                Text(lead.source)
+            // The scope disclosure, rendered STRUCTURALLY rather than
+            // trusted to prose. Today every `kind` the server emits puts
+            // the scope in `detail` too, so this is belt-and-braces — but
+            // the whole point of the money lead is that a dollar figure
+            // is the most believable thing on the page and the easiest to
+            // read as being about THIS home. The day a lead ships whose
+            // `detail` omits it, the figure would stand alone. Web has
+            // shown this since Wave 4; both native clients decoded
+            // `scope` and rendered neither.
+            if !lead.source.isEmpty || !lead.scope.isEmpty {
+                Text(scopeFooter(lead))
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(Theme.Color.appTextMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("place.preview.moneyLead.scope")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

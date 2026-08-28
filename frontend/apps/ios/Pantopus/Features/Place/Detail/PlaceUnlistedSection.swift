@@ -64,7 +64,16 @@ final class PlaceUnlistedViewModel {
     /// Steps saved since the last load. They win over `progress` so a
     /// row the person just set reads back correctly even when the read
     /// of everything else failed.
-    private var recentEdits: [String: UnlistedRemovalStatus] = [:]
+    ///
+    /// Holds the RESOLVED progress, not the raw server status. Caching
+    /// the raw value let an unreadable echo
+    /// become `.status(.unknown)`, which highlights no button AND does
+    /// not match the `.unknown` case that renders "we couldn't read your
+    /// saved progress" — so the row went silently blank behind a green
+    /// "Saved." toast. It under-reports rather than over-reports, which
+    /// is the right direction to fail, but the reader was told the
+    /// opposite of what they were shown.
+    private var recentEdits: [String: RowProgress] = [:]
 
     let homeId: String
     private let api: APIClient
@@ -103,8 +112,16 @@ final class PlaceUnlistedViewModel {
             let response: UnlistedRemovalResponse = try await api.request(
                 UnlistedEndpoints.setRemovalStatus(homeId: homeId, brokerId: brokerId, status: status)
             )
-            recentEdits[brokerId] = response.removal.status
-            toast = ("Saved. Only you can see this.", false)
+            // Same honesty check the read path applies. A status this
+            // build cannot read is not progress we may render.
+            let echoed = response.removal.status
+            if echoed == .unknown {
+                recentEdits[brokerId] = .unknown
+                toast = ("Saved, but this app can't show that step yet — update to see it.", false)
+            } else {
+                recentEdits[brokerId] = .status(echoed)
+                toast = ("Saved. Only you can see this.", false)
+            }
         } catch let error as APIError {
             toast = (Self.saveFailureMessage(error), true)
         } catch {
@@ -115,7 +132,7 @@ final class PlaceUnlistedViewModel {
     /// What this row can claim. `.unknown` when the progress read failed
     /// and the person has not set this one since.
     func rowProgress(brokerId: String) -> RowProgress {
-        if let edited = recentEdits[brokerId] { return .status(edited) }
+        if let edited = recentEdits[brokerId] { return edited }
         switch progress {
         case let .recorded(rows):
             guard let row = rows.first(where: { $0.brokerId == brokerId }) else {
@@ -178,6 +195,12 @@ struct PlaceUnlistedSection: View {
                 UnlistedMethodNoteCard(profile: profile)
                 if vm.isProgressUnavailable {
                     UnlistedProgressUnavailableCard(vm: vm)
+                } else {
+                    // How far through the list this person actually is.
+                    // Android has told them since Wave 4; iOS said
+                    // nothing, so the same account got a progress summary
+                    // on one phone and a bare list on the other.
+                    UnlistedProgressLine(profile: profile, vm: vm)
                 }
                 ForEach(profile.groups) { group in
                     UnlistedGroupCard(group: group, profile: profile, vm: vm)
@@ -249,7 +272,7 @@ private struct UnlistedStateProgramCard: View {
                         eligibilityBlock(program.eligibility, title: "Who qualifies")
                     }
                     if let url = program.programURL {
-                        linkRow("Open the official program page", url: url, id: "program")
+                        linkRow("Open the official program page", url: url, id: "official")
                     }
                     if let source = program.sourceURL, source != program.programURL {
                         linkRow("What we checked this against", url: source, id: "source")
@@ -410,42 +433,6 @@ private struct UnlistedMethodNoteCard: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - The progress read failed
-
-private struct UnlistedProgressUnavailableCard: View {
-    let vm: PlaceUnlistedViewModel
-
-    var body: some View {
-        PlaceDetailCard(padding: 14) {
-            HStack(alignment: .top, spacing: 9) {
-                Icon(.triangleAlert, size: 16, strokeWidth: 2.25, color: Theme.Color.warning)
-                    .padding(.top, 1)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("We couldn't load what you've already done")
-                        .font(.system(size: 13.5, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appText)
-                    Text(
-                        "The list below is the removal paths, not a checklist of your progress — "
-                            + "steps you have already taken may not be showing."
-                    )
-                    .font(.system(size: 12.5))
-                    .lineSpacing(2)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                    Button {
-                        Task { await vm.refresh() }
-                    } label: {
-                        Text("Try again")
-                            .font(.system(size: 12.5, weight: .semibold))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Theme.Color.primary600)
-                }
-            }
-        }
-        .accessibilityIdentifier("place.unlisted.progress.unavailable")
     }
 }
 

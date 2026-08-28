@@ -236,12 +236,25 @@ public struct UnlistedBroker: Decodable, Sendable, Hashable, Identifiable {
 /// `label` is the server's human heading for the category.
 public struct UnlistedBrokerGroup: Decodable, Sendable, Hashable, Identifiable {
     public let category: UnlistedBrokerCategory
+    /// The category exactly as the server sent it, kept alongside the
+    /// typed enum so an unrecognised value still has a stable identity.
+    public let rawCategory: String
     public let label: String
     public let brokers: [UnlistedBroker]
 
-    /// The label is the stable per-group identity — an unrecognised
-    /// category would otherwise collide every unknown group into one.
-    public var id: String { label }
+    /// The RAW CATEGORY is the identity, not the label.
+    ///
+    /// This used to be `label`, with a comment claiming that avoided
+    /// collisions. It did not: `label` decodes to "" when absent, so two
+    /// groups with an unread label both get `id == ""` — and duplicate
+    /// ids in a SwiftUI ForEach silently drop a row, which here means an
+    /// entire category of removal paths vanishing from a page someone is
+    /// using to get their address offline.
+    ///
+    /// It also matches Android's `place.unlisted.group.${group.category}`,
+    /// so the two clients' test identifiers finally agree, and it no
+    /// longer re-keys every identifier when a label's copy is edited.
+    public var id: String { rawCategory.isEmpty ? (label.isEmpty ? "unknown" : label) : rawCategory }
 
     private enum CodingKeys: String, CodingKey {
         case category, label, brokers
@@ -250,6 +263,7 @@ public struct UnlistedBrokerGroup: Decodable, Sendable, Hashable, Identifiable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         category = try container.decodeIfPresent(UnlistedBrokerCategory.self, forKey: .category) ?? .unknown
+        rawCategory = (try? container.decode(String.self, forKey: .category)) ?? ""
         label = try container.decodeIfPresent(String.self, forKey: .label) ?? ""
         brokers = try container.decodeIfPresent([UnlistedBroker].self, forKey: .brokers) ?? []
     }
