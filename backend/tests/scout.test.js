@@ -121,10 +121,27 @@ describe('the question list is the product', () => {
 describe('the flood-zone classification', () => {
   const { isSpecialFloodHazardArea } = require('../services/scoutService');
 
-  test('the real high-risk zones are high-risk', () => {
-    for (const zone of ['A', 'AE', 'AH', 'AO', 'AR', 'A99', 'A12', 'V', 'VE', 'V30']) {
+  test('the real high-risk zones are high-risk, INCLUDING the AR dual zones', () => {
+    // The AR duals are written with a slash and are SFHAs — FEMA's own
+    // flood-zone glossary lists AR/AE, AR/AO, AR/A1-A30 and AR/A next to
+    // A and V. The first version of this function missed all of them,
+    // which is a FALSE NEGATIVE on genuinely high-risk land: worse than
+    // the "AREA NOT INCLUDED" bug it was written to fix, because it
+    // suppresses the question about who pays for insurance a federally
+    // backed mortgage actually requires.
+    const zones = [
+      'A', 'AE', 'AH', 'AO', 'AR', 'A99', 'A12', 'V', 'VE', 'V30',
+      'AR/A', 'AR/AE', 'AR/AH', 'AR/AO', 'AR/A12',
+    ];
+    for (const zone of zones) {
       expect({ zone, sfha: isSpecialFloodHazardArea(zone) }).toEqual({ zone, sfha: true });
     }
+  });
+
+  test('an AR dual zone still raises the insurance-is-required question', () => {
+    // The classification only matters through what it generates.
+    const asks = askBeforeYouSign({ flood: { zone: 'AR/AE', in_sfha: isSpecialFloodHazardArea('AR/AE') } });
+    expect(asks.map((a) => a.id)).toContain('flood_insurance_required');
   });
 
   test('unmapped, undetermined and low-risk zones are not', () => {

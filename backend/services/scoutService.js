@@ -68,7 +68,16 @@ const LEAD_DISCLOSURE_YEAR = 1978;
  * B, C, D (undetermined), open water, unmapped — is not.
  */
 function isSpecialFloodHazardArea(zone) {
-  return /^(A|AE|AH|AO|AR|A99|A\d{1,2}|V|VE|V\d{1,2})$/.test(String(zone || '').trim().toUpperCase());
+  const z = String(zone || '').trim().toUpperCase();
+  // The AR DUAL ZONES are SFHAs and are written with a slash: AR/AE,
+  // AR/AO, AR/AH, AR/A, AR/A1-A30 (FEMA's own flood-zone glossary lists
+  // them alongside A and V). The first version of this function missed
+  // every one of them — a FALSE NEGATIVE on genuinely high-risk land,
+  // which is the worse direction to fail than the "AREA NOT INCLUDED"
+  // bug it was written to fix: it suppresses the question about who pays
+  // for the insurance a federally backed mortgage actually requires.
+  if (/^AR\/(A|AE|AH|AO|A99|A\d{1,2})$/.test(z)) return true;
+  return /^(A|AE|AH|AO|AR|A99|A\d{1,2}|V|VE|V\d{1,2})$/.test(z);
 }
 
 /**

@@ -188,13 +188,28 @@ export default function ScoutView({ report, onNewSearch }: { report: ScoutReport
                       <Droplets size={17} strokeWidth={2} />
                     </span>
                     <div className="min-w-0 flex-1">
+                      {/*
+                        NOT "the water system for this address".
+                        composeDrinkingWater picks the county's system whose
+                        name matches the city, ELSE THE LARGEST in the county
+                        — the dashboard marks that `coverage: 'partial'`, and
+                        Scout's projection dropped the nuance. Naming a
+                        utility and attaching "no violations" to it as a fact
+                        about this building is a false all-clear when the
+                        guess is wrong, told to someone deciding whether to
+                        sign. So the label says what it actually is, and the
+                        caveat turns it into the question it should be.
+                      */}
                       <FactRow
-                        label="Water system"
+                        label="Main water system in this county"
                         value={water.utility_name || 'Not identified'}
                         note={water.violation_count > 0
                           ? `${water.violation_count} health-based violation${water.violation_count === 1 ? '' : 's'} in the last 5 years`
                           : 'No health-based violations in the last 5 years'}
                       />
+                      <p className="text-[12.5px] leading-[18px] text-app-text-muted pb-2.5">
+                        Counties often have several. Worth asking which one actually serves this address.
+                      </p>
                     </div>
                   </div>
                 ) : null}

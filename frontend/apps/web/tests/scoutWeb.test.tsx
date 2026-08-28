@@ -270,6 +270,24 @@ describe('the flood zone', () => {
   });
 });
 
+// ── The water system is a county guess, not a fact ──────────
+
+describe('the water system', () => {
+  it('is never presented as the system serving this address', async () => {
+    // composeDrinkingWater picks the county system matching the city name
+    // ELSE THE LARGEST in the county. Naming it and attaching "no
+    // violations" as a fact about this building is a false all-clear
+    // whenever the guess is wrong.
+    getScoutReport.mockResolvedValue({ status: 'ready', scout: report() });
+    await runLookup();
+
+    expect(await screen.findByText(/main water system in this county/i)).toBeInTheDocument();
+    expect(screen.getByText(/which one actually serves this address/i)).toBeInTheDocument();
+    // The bare, confident label that used to head this row.
+    expect(screen.queryByText(/^Water system$/)).not.toBeInTheDocument();
+  });
+});
+
 // ── The rent verdict ────────────────────────────────────────
 
 describe('the rent verdict never stands alone', () => {
