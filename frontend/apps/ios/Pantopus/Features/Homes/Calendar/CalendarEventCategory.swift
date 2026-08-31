@@ -19,7 +19,7 @@
 
 import SwiftUI
 
-/// The 11 designed event categories + a `generic` fallback for any
+/// The designed event categories + a `generic` fallback for any
 /// `event_type` the inference helper can't classify.
 public enum CalendarEventCategory: String, CaseIterable, Sendable {
     case chore
@@ -32,7 +32,10 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
     case pet
     case bill
     case medical
+    case meal
     case trash
+    /// Vendor/guest visits scheduled via F13 (`event_type` vendor|guest).
+    case visit
     case generic
 
     /// User-facing label rendered in the inline event-type chip.
@@ -48,8 +51,26 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         case .pet: "Pet"
         case .bill: "Bill"
         case .medical: "Medical"
+        case .meal: "Meal"
         case .trash: "Trash day"
+        case .visit: "Visit"
         case .generic: "Event"
+        }
+    }
+
+    /// Label used by the Home add/edit-event category picker. The picker
+    /// surfaces the design's 5-category vocabulary (health/chore/meal/family/
+    /// school — `add-event-frames.jsx:8`, `CAT` in `home-shell.jsx`) where the
+    /// copy differs from the agenda `label` ("Health" vs "Medical",
+    /// pluralised "Chores"/"Meals").
+    public var pickerLabel: String {
+        switch self {
+        case .medical: "Health"
+        case .chore: "Chores"
+        case .meal: "Meals"
+        case .family: "Family"
+        case .school: "School"
+        default: label
         }
     }
 
@@ -66,7 +87,9 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         case .pet: .pawPrint
         case .bill: .receipt
         case .medical: .stethoscope
+        case .meal: .utensils
         case .trash: .trash2
+        case .visit: .doorOpen
         case .generic: .calendar
         }
     }
@@ -104,9 +127,15 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         case .medical:
             // CSS fee2e2
             Color(red: 0xFE / 255.0, green: 0xE2 / 255.0, blue: 0xE2 / 255.0)
+        case .meal:
+            // CSS fef3c7 — warm amber, pairs with the design meal dot d97706.
+            Color(red: 0xFE / 255.0, green: 0xF3 / 255.0, blue: 0xC7 / 255.0)
         case .trash:
             // CSS e2e8f0
             Color(red: 0xE2 / 255.0, green: 0xE8 / 255.0, blue: 0xF0 / 255.0)
+        case .visit:
+            // CSS ccfbf1 — soft teal, pairs with the design visit dot 0d9488.
+            Color(red: 0xCC / 255.0, green: 0xFB / 255.0, blue: 0xF1 / 255.0)
         case .generic:
             // primary50
             Color(red: 0xF0 / 255.0, green: 0xF9 / 255.0, blue: 0xFF / 255.0)
@@ -146,18 +175,52 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         case .medical:
             // CSS b91c1c
             Color(red: 0xB9 / 255.0, green: 0x1C / 255.0, blue: 0x1C / 255.0)
+        case .meal:
+            // CSS d97706 — design meal accent.
+            Color(red: 0xD9 / 255.0, green: 0x77 / 255.0, blue: 0x06 / 255.0)
         case .trash:
             // CSS 334155
             Color(red: 0x33 / 255.0, green: 0x41 / 255.0, blue: 0x55 / 255.0)
+        case .visit:
+            // CSS 0f766e — teal 700
+            Color(red: 0x0F / 255.0, green: 0x76 / 255.0, blue: 0x6E / 255.0)
         case .generic:
             // primary600
             Color(red: 0x02 / 255.0, green: 0x84 / 255.0, blue: 0xC7 / 255.0)
         }
     }
 
+    /// Solid category dot rendered in the Home add/edit-event picker pill.
+    /// Mirrors the design's `CAT[*].c` swatch (`home-shell.jsx:28-35`) for the
+    /// five picker categories; other categories reuse `foreground`.
+    public var dotColor: Color {
+        switch self {
+        case .medical:
+            // CSS e11d48 — design "health" dot.
+            Color(red: 0xE1 / 255.0, green: 0x1D / 255.0, blue: 0x48 / 255.0)
+        case .chore:
+            // CSS f97316 — design "chore" dot.
+            Color(red: 0xF9 / 255.0, green: 0x73 / 255.0, blue: 0x16 / 255.0)
+        case .meal:
+            // CSS d97706 — design "meal" dot.
+            Color(red: 0xD9 / 255.0, green: 0x77 / 255.0, blue: 0x06 / 255.0)
+        case .family:
+            // CSS 7c3aed — design "family" dot.
+            Color(red: 0x7C / 255.0, green: 0x3A / 255.0, blue: 0xED / 255.0)
+        case .school:
+            // CSS 2980b9 — design "school" dot.
+            Color(red: 0x29 / 255.0, green: 0x80 / 255.0, blue: 0xB9 / 255.0)
+        case .visit:
+            // CSS 0d9488 — design "visit" dot (CAT.visit, home-shell.jsx:34).
+            Color(red: 0x0D / 255.0, green: 0x94 / 255.0, blue: 0x88 / 255.0)
+        default:
+            foreground
+        }
+    }
+
     // MARK: - Inference
 
-    /// Map a backend `event_type` string to one of the 12 designed
+    /// Map a backend `event_type` string to one of the designed
     /// categories. Case-insensitive substring match — unknown strings
     /// fall back to `.generic`. Mirrors the iOS / Android / web inference
     /// pattern documented in `docs/t6-buildout-plan.md`.
@@ -194,37 +257,44 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         "medical": .medical,
         "doctor": .medical,
         "appointment": .medical,
+        "meal": .meal,
+        "breakfast": .meal,
+        "lunch": .meal,
+        "dinner": .meal,
         "trash": .trash,
         "garbage": .trash,
         "recycling": .trash,
+        "visit": .visit,
+        "vendor": .visit,
+        "guest": .visit,
         "general": .generic
+    ]
+
+    /// Ordered keyword table backing `heuristicCategory` — first rule whose
+    /// keyword substring-matches wins, so ordering is load-bearing (e.g.
+    /// "vet_visit" must hit `.pet` before the `.visit` rule).
+    private static let heuristicRules: [(keywords: [String], category: CalendarEventCategory)] = [
+        (["birthday", "anniversary"], .birthday),
+        (["vet", "pet"], .pet),
+        (["bill", "payment"], .bill),
+        (["doctor", "medical", "dentist"], .medical),
+        (["trash", "garbage", "recycling"], .trash),
+        (["school", "class"], .school),
+        (["delivery", "package", "amazon"], .delivery),
+        (["meal", "breakfast", "lunch", "dinner", "brunch", "supper"], .meal),
+        (["party", "social"], .social),
+        (["visit", "vendor", "guest"], .visit),
+        (["repair", "maintenance", "plumber", "electrician", "hvac"], .maintenance),
+        (["chore", "clean"], .chore),
+        (["family", "kids"], .family)
     ]
 
     /// Fallback heuristics for noisier backend strings (`"vet_appt"`,
     /// `"birthday_party"`, etc.). First substring match wins.
     private static func heuristicCategory(for raw: String) -> CalendarEventCategory {
-        if raw.contains("birthday") || raw.contains("anniversary") { return .birthday }
-        if raw.contains("vet") || raw.contains("pet") { return .pet }
-        if raw.contains("bill") || raw.contains("payment") { return .bill }
-        if raw.contains("doctor") || raw.contains("medical") || raw.contains("dentist") {
-            return .medical
+        for rule in heuristicRules where rule.keywords.contains(where: raw.contains) {
+            return rule.category
         }
-        if raw.contains("trash") || raw.contains("garbage") || raw.contains("recycling") {
-            return .trash
-        }
-        if raw.contains("school") || raw.contains("class") { return .school }
-        if raw.contains("delivery") || raw.contains("package") || raw.contains("amazon") {
-            return .delivery
-        }
-        if raw.contains("party") || raw.contains("dinner") || raw.contains("social") {
-            return .social
-        }
-        if raw.contains("repair") || raw.contains("maintenance") || raw.contains("plumber") ||
-            raw.contains("electrician") || raw.contains("hvac") {
-            return .maintenance
-        }
-        if raw.contains("chore") || raw.contains("clean") { return .chore }
-        if raw.contains("family") || raw.contains("kids") { return .family }
         return .generic
     }
 }

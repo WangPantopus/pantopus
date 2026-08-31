@@ -163,7 +163,7 @@ public struct WizardShell<Content: View>: View {
     }
 }
 
-/// 44pt top bar: X/back leading, centered title, "N of M" trailing.
+/// 56pt top bar: X/back leading, centered title, "N/M" trailing.
 private struct WizardTopBar: View {
     let title: String
     let leading: WizardLeadingControl
@@ -186,7 +186,7 @@ private struct WizardTopBar: View {
                 Spacer()
                 Group {
                     if case let .stepOf(current, total) = progressLabel {
-                        Text("\(current) of \(total)")
+                        Text("\(current)/\(total)")
                             .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextSecondary)
                             .padding(.horizontal, Spacing.s3)
@@ -196,9 +196,9 @@ private struct WizardTopBar: View {
                     }
                 }
             }
-            .padding(.horizontal, Spacing.s2)
+            .padding(.horizontal, Spacing.s3)
         }
-        .frame(height: 44)
+        .frame(height: 56)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)

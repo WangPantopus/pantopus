@@ -3,8 +3,6 @@
     "MagicNumber",
     "TooManyFunctions",
     "LongMethod",
-    "ComplexMethod",
-    "CyclomaticComplexMethod",
     "LongParameterList",
 )
 
@@ -14,24 +12,17 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.CalendarEventDto
+import app.pantopus.android.data.api.models.homes.OccupantDto
+import app.pantopus.android.data.api.models.homes.OccupantsResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
+import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.homes.HomeMembersRepository
 import app.pantopus.android.data.homes.HomesRepository
-import app.pantopus.android.ui.components.StatusChipVariant
-import app.pantopus.android.ui.screens.shared.list_of_rows.BannerConfig
-import app.pantopus.android.ui.screens.shared.list_of_rows.BannerCta
-import app.pantopus.android.ui.screens.shared.list_of_rows.BannerCtaTint
-import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
-import app.pantopus.android.ui.screens.shared.list_of_rows.FabTint
-import app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant
-import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowModel
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
-import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.data.network.NetworkMonitor
+import app.pantopus.android.data.scheduling.SchedulingOwner
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling.bookings.BookingsOwnerRelay
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -39,145 +30,176 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.time.DayOfWeek
-import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import javax.inject.Inject
 
 /** Nav arg key for the Home calendar route. */
 const val HOME_CALENDAR_HOME_ID_KEY = "homeId"
 
 /**
- * Banner summary projected from the loaded events + clock. Pure value —
- * exposed for tests that exercise the projection without standing the
- * view-model up.
+ * `source` / `event_type` marker stamped on the synthetic rows that carry
+ * a derived task / bill / package due-date through the agenda projection.
+ * It is neither `event` nor `booking`, so [HomeAgendaItem.isBooking] stays
+ * false and the row never routes to A8; as an `event_type` it infers to
+ * [CalendarEventCategory.Generic], which no derived row ever renders.
+ * Client-only — never sent on the wire.
  */
-data class HomeCalendarBannerSummary(
-    val count: Int,
-    val nextLabel: String?,
-) {
-    val hasContent: Boolean get() = count > 0 || nextLabel != null
+private const val DERIVED_SOURCE = "derived"
 
-    val title: String
-        get() =
-            when (count) {
-                0 -> "Nothing scheduled this week"
-                1 -> "1 event this week"
-                else -> "$count events this week"
-            }
+/** Render state for the bespoke Home calendar agenda (F1). */
+sealed interface HomeCalendarUiState {
+    data object Loading : HomeCalendarUiState
 
-    val subtitle: String?
-        get() = nextLabel?.let { "Next · $it" }
+    data class Error(val message: String) : HomeCalendarUiState
+
+    /** [empty] is non-null when there are no rows to show (first-run / filtered). */
+    data class Loaded(
+        val sections: List<HomeAgendaSection>,
+        val empty: AgendaEmpty?,
+    ) : HomeCalendarUiState
 }
 
 /**
- * One parsed event row in the agenda. Pure value — exposed for test
- * fixtures.
- */
-data class ParsedCalendarEvent(
-    val dto: CalendarEventDto,
-    val start: Instant,
-    val isoDate: String,
-)
-
-/**
- * A dated agenda item after projection — either a home event or a
- * derived task / bill / package due date. Bucketing works over these so
- * both kinds share one grouping pass.
+ * F1 — Home Calendar / Agenda. Fetches the booking **union**
+ * (`GET /api/homes/:id/events`, rows tagged `source:'event'|'booking'`)
+ * and projects it into a day-grouped agenda + a 7-day month strip + a
+ * member filter row. Mirrors iOS `HomeCalendarViewModel`.
  *
- * Parity contract — mirrored in iOS `HomeCalendarViewModel.AgendaEntry`.
- */
-data class AgendaEntry(
-    val date: Instant,
-    val isoDate: String,
-    val row: RowModel,
-)
-
-/**
- * T6.4c (P18) — drives the Home calendar surface. Fetches
- * `GET /api/homes/:id/events` and projects the response into:
- *  - a [MonthStripState] for [MonthStripHeader] (month label, 7-day
- *    window, today index, per-day event dots, user-selected day),
- *  - a [BannerConfig] summary ("N events this week · next: …") with a
- *    "Today" CTA that clears the selection,
- *  - a list of [RowSection]s grouped by relative day bucket (Today /
- *    Tomorrow / day-name / Next week / Later, or a single date section
- *    when a day is selected).
+ * Booking rows are read-only — tapping one routes to A8's Booking Detail
+ * by route; never persisted as a `HomeCalendarEvent`.
  *
- * The view-model uses an injectable `now` clock so unit tests can drive
- * deterministic section bucketing + month-strip dot counts.
+ * Task due-dates, bill due-dates and package expected-delivery dates are
+ * plotted alongside the events (see [fetchDerived] / [derivedRow]) so a
+ * household sees everything that lands on a day, not just calendar
+ * entries. Those rows are read-only, and — having no household owner —
+ * they are exempt from the member filter, so they stay visible under
+ * "All", "Mine" and every per-member chip. Anything else contradicts the
+ * month strip, which counts their dots unfiltered.
  */
 @HiltViewModel
 class HomeCalendarViewModel
     internal constructor(
         private val repo: HomesRepository,
+        private val membersRepo: HomeMembersRepository,
+        private val authRepository: AuthRepository,
+        private val networkMonitor: NetworkMonitor,
+        private val bookingsOwnerRelay: BookingsOwnerRelay,
         savedStateHandle: SavedStateHandle,
         private val clock: () -> Instant = Instant::now,
-        private val zone: ZoneId = ZoneId.of("UTC"),
+        // Device-local display zone — agenda rows and the month strip render
+        // the same wall time the event form composes instants from (iOS
+        // parity), and a bare `yyyy-MM-dd` due date anchors to midnight in it.
+        // Tests inject a fixed zone; the all-day heuristic for *timestamped*
+        // events stays pinned to UTC inside HomeAgendaBuilder.
+        private val zone: ZoneId = ZoneId.systemDefault(),
     ) : ViewModel() {
         @Inject
         constructor(
             repo: HomesRepository,
+            membersRepo: HomeMembersRepository,
+            authRepository: AuthRepository,
+            networkMonitor: NetworkMonitor,
+            bookingsOwnerRelay: BookingsOwnerRelay,
             savedStateHandle: SavedStateHandle,
-        ) : this(repo, savedStateHandle, Instant::now, ZoneId.of("UTC"))
+        ) : this(
+            repo,
+            membersRepo,
+            authRepository,
+            networkMonitor,
+            bookingsOwnerRelay,
+            savedStateHandle,
+            Instant::now,
+            ZoneId.systemDefault(),
+        )
 
         private val homeId: String =
             checkNotNull(savedStateHandle.get<String>(HOME_CALENDAR_HOME_ID_KEY)) {
                 "HomeCalendarViewModel requires a $HOME_CALENDAR_HOME_ID_KEY nav argument"
             }
 
-        private val _state = MutableStateFlow<ListOfRowsUiState>(ListOfRowsUiState.Loading)
-        val state: StateFlow<ListOfRowsUiState> = _state.asStateFlow()
+        val isOnline: StateFlow<Boolean> get() = networkMonitor.isOnline
+
+        private val _state = MutableStateFlow<HomeCalendarUiState>(HomeCalendarUiState.Loading)
+        val state: StateFlow<HomeCalendarUiState> = _state.asStateFlow()
 
         private val _monthStrip = MutableStateFlow<MonthStripState?>(null)
         val monthStrip: StateFlow<MonthStripState?> = _monthStrip.asStateFlow()
 
-        private val _banner = MutableStateFlow<BannerConfig?>(null)
-        val banner: StateFlow<BannerConfig?> = _banner.asStateFlow()
+        private val _filterChips = MutableStateFlow<List<MemberFilter>>(listOf(MemberFilter.All, MemberFilter.Mine))
+        val filterChips: StateFlow<List<MemberFilter>> = _filterChips.asStateFlow()
+
+        private val _memberFilter = MutableStateFlow<MemberFilter>(MemberFilter.All)
+        val memberFilter: StateFlow<MemberFilter> = _memberFilter.asStateFlow()
 
         private var events: List<CalendarEventDto> = emptyList()
 
         /**
          * Task due-dates, bill due-dates and package expected-delivery
-         * dates plotted alongside the home events. RN's month grid does
-         * the same (`src/app/homes/[id]/calendar.tsx:48-74`) so a
-         * household can see everything that lands on a day, not just
-         * calendar entries.
+         * dates plotted alongside the home events, already projected into
+         * the agenda's own entry shape. RN's month grid does the same
+         * (`src/app/homes/[id]/calendar.tsx:48-74`) so a household can see
+         * everything that lands on a day, not just calendar entries.
+         *
+         * Kept as rows (rather than as the raw [HomeCalendarDerivedItem]
+         * feed) so events and derived due-dates share exactly one grouping
+         * pass through [HomeAgendaBuilder] — the same single-pass contract
+         * the list-of-rows projection expressed with its `AgendaEntry`.
          */
-        private var derived: List<HomeCalendarDerivedItem> = emptyList()
+        private var derivedRows: List<CalendarEventDto> = emptyList()
 
-        /** First (Sunday) day of the visible week. */
-        private var weekAnchor: LocalDate = weekAnchorFor(clock().atZone(zone).toLocalDate())
+        /**
+         * The [HomeCalendarDerivedItem] behind each row in [derivedRows],
+         * keyed by the synthetic DTO id. Travelling alongside the rows — not
+         * folded into them — is what lets the projection render each row
+         * with its kind's own label / icon / background / foreground and its
+         * `detail ?: kind.label` subtitle, exempt it from the member filter
+         * and mark it read-only, instead of re-deriving any of that from an
+         * `event_type` string.
+         */
+        private var derivedIndex: HomeAgendaDerivedIndex = emptyMap()
+
+        private var membersMap: Map<String, HomeMember> = emptyMap()
+        private var resolvedUserId: String? = null
+        private var weekAnchorIso: String = HomeAgendaBuilder.weekAnchorIso(clock(), zone)
         private var selectedIsoDate: String? = null
 
         private var onAddEvent: () -> Unit = {}
         private var onOpenEvent: (String) -> Unit = {}
+        private var onNavigate: (String) -> Unit = {}
 
         fun configureNavigation(
             onAddEvent: () -> Unit = {},
             onOpenEvent: (String) -> Unit = {},
+            onNavigate: (String) -> Unit = {},
         ) {
             this.onAddEvent = onAddEvent
             this.onOpenEvent = onOpenEvent
+            this.onNavigate = onNavigate
         }
 
         // MARK: - Lifecycle
 
         fun load() {
-            refresh()
+            _state.value = HomeCalendarUiState.Loading
+            fetch()
         }
 
         fun refresh() {
-            _state.value = ListOfRowsUiState.Loading
+            fetch()
+        }
+
+        private fun fetch() {
             viewModelScope.launch {
-                when (val result = repo.getHomeEvents(homeId)) {
+                if (resolvedUserId == null) resolvedUserId = signedInUserId()
+                val eventsTask = async { repo.getHomeEvents(homeId) }
+                val membersTask = async { membersRepo.listOccupants(homeId) }
+                val eventsResult = eventsTask.await()
+                applyMembers(membersTask.await())
+                when (eventsResult) {
                     is NetworkResult.Success -> {
-                        events = result.data.events
+                        events = eventsResult.data.events
                         // Events are the primary read — the three derived
                         // feeds are best-effort side-reads that must never
                         // fail the calendar.
@@ -186,10 +208,16 @@ class HomeCalendarViewModel
                     }
                     is NetworkResult.Failure -> {
                         events = emptyList()
-                        derived = emptyList()
-                        _banner.value = null
-                        _monthStrip.value = null
-                        _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
+                        derivedRows = emptyList()
+                        derivedIndex = emptyMap()
+                        // Keep the last-built month strip so a refresh failure
+                        // after a successful load retains the chrome (design
+                        // FrameError keeps the strip; mirrors iOS, which never
+                        // clears `monthStrip` on error).
+                        _state.value =
+                            HomeCalendarUiState.Error(
+                                eventsResult.error.displayMessage("Couldn't load your calendar."),
+                            )
                     }
                 }
             }
@@ -205,481 +233,213 @@ class HomeCalendarViewModel
                 val tasksDeferred = async { repo.getHomeTasks(homeId) }
                 val billsDeferred = async { repo.getHomeBills(homeId) }
                 val packagesDeferred = async { repo.getHomePackages(homeId) }
-                derived =
+                val items =
                     HomeCalendarDerivedItem.build(
                         tasks = (tasksDeferred.await() as? NetworkResult.Success)?.data?.tasks.orEmpty(),
                         bills = (billsDeferred.await() as? NetworkResult.Success)?.data?.bills.orEmpty(),
                         packages = (packagesDeferred.await() as? NetworkResult.Success)?.data?.packages.orEmpty(),
                     )
+                // Anything the agenda can't place is dropped here — it would be
+                // skipped silently downstream and must not count towards "the
+                // household has nothing at all". Bare `yyyy-MM-dd` values are
+                // resolved in the display zone, exactly as the projection does.
+                val placeable = items.filter { HomeAgendaBuilder.parseInstant(it.dateIso, zone) != null }
+                derivedRows = placeable.map(::derivedRow)
+                derivedIndex = placeable.associateBy { it.id }
             }
 
-        // MARK: - Mutators driven by MonthStripHeader
+        private fun applyMembers(result: NetworkResult<OccupantsResponse>) {
+            val occupants =
+                when (result) {
+                    is NetworkResult.Success -> result.data.occupants.filter { it.isActive }
+                    is NetworkResult.Failure -> emptyList()
+                }
+            val members = occupants.map(::projectMember)
+            membersMap = members.associateBy { it.id }
+            _filterChips.value =
+                buildList {
+                    add(MemberFilter.All)
+                    add(MemberFilter.Mine)
+                    members.forEach { add(MemberFilter.Member(it.id, it.name)) }
+                }
+        }
 
-        /** Toggle a day filter. Selecting the already-selected day clears it. */
+        private fun projectMember(occupant: OccupantDto): HomeMember {
+            val name =
+                occupant.displayName?.takeIf { it.isNotBlank() }
+                    ?: occupant.username
+                    ?: "Member"
+            return HomeMember(
+                id = occupant.userId,
+                name = name,
+                initials = HomeMember.initialsFor(name),
+                isYou = occupant.userId == resolvedUserId,
+            )
+        }
+
+        /**
+         * Project one derived due-date into the agenda's wire shape so the
+         * single [HomeAgendaBuilder] pass buckets it, headers it, counts its
+         * month-strip dot and honours the selected day exactly like an event.
+         * The row's *presentation* does not come from this DTO — the
+         * [HomeCalendarDerivedItem] travels alongside it in [derivedIndex],
+         * and the row reads its kind's own label / icon / background /
+         * foreground plus `detail ?: kind.label`.
+         *
+         *  - `source` is [DERIVED_SOURCE], so the row is not a booking; the
+         *    screen renders it disabled and [openAgendaItem] refuses it.
+         *  - `eventType` is [DERIVED_SOURCE] too — a client-only marker that
+         *    infers to [CalendarEventCategory.Generic] and is never rendered.
+         *    Borrowing a real `event_type` here would route a bill through the
+         *    category palette and paint an unpaid bill green.
+         *  - `assignedTo` is null: a task / bill / package due-date has no
+         *    household owner. The projection therefore *exempts* derived
+         *    entries from the member predicate instead of letting them be
+         *    filtered out. Documented parity contract — iOS applies the same
+         *    rule.
+         *  - `endAt` is null; `startAt` carries the raw `dateIso`, so a bare
+         *    `yyyy-MM-dd` is recognised as date-only and reads "All day".
+         */
+        private fun derivedRow(item: HomeCalendarDerivedItem): CalendarEventDto =
+            CalendarEventDto(
+                id = item.id,
+                homeId = homeId,
+                eventType = DERIVED_SOURCE,
+                title = item.title,
+                startAt = item.dateIso,
+                endAt = null,
+                assignedTo = null,
+                source = DERIVED_SOURCE,
+            )
+
+        // MARK: - Mutators
+
         fun selectDay(isoDate: String) {
             if (selectedIsoDate == isoDate) {
                 selectedIsoDate = null
             } else {
                 selectedIsoDate = isoDate
-                val parsed = parseIsoDate(isoDate)
-                if (parsed != null) {
-                    weekAnchor = weekAnchorFor(parsed)
+                runCatching { LocalDate.parse(isoDate) }.getOrNull()?.let {
+                    weekAnchorIso = HomeAgendaBuilder.weekAnchorIso(it.atStartOfDay(zone).toInstant(), zone)
                 }
             }
             rebuild()
         }
 
-        /** Roll the visible week by ±7 days. */
         fun shiftWeek(direction: WeekShift) {
-            val delta =
-                when (direction) {
-                    WeekShift.Previous -> -7L
-                    WeekShift.Next -> 7L
-                }
-            weekAnchor = weekAnchor.plusDays(delta)
+            val delta = if (direction == WeekShift.Previous) -7L else 7L
+            val anchor = runCatching { LocalDate.parse(weekAnchorIso) }.getOrNull() ?: return
+            weekAnchorIso = anchor.plusDays(delta).toString()
             rebuild()
         }
 
-        /** Banner "Today" CTA — clears the day filter and re-anchors the week. */
         fun jumpToToday() {
             selectedIsoDate = null
-            weekAnchor = weekAnchorFor(clock().atZone(zone).toLocalDate())
+            weekAnchorIso = HomeAgendaBuilder.weekAnchorIso(clock(), zone)
             rebuild()
         }
 
-        fun fab(): FabAction =
-            FabAction(
-                icon = PantopusIcon.Plus,
-                contentDescription = "Add event",
-                variant = FabVariant.SecondaryCreate,
-                tint = FabTint.Home,
-                onClick = { onAddEvent() },
-            )
+        fun selectFilter(filter: MemberFilter) {
+            _memberFilter.value = filter
+            rebuild()
+        }
+
+        fun clearMemberFilter() {
+            _memberFilter.value = MemberFilter.All
+            rebuild()
+        }
+
+        // MARK: - Navigation
+
+        fun openAgendaItem(item: HomeAgendaItem) {
+            if (isDerived(item)) {
+                // Derived task / bill / package due-dates mirror surfaces that
+                // own their own screens, so tapping is a no-op exactly as in
+                // RN's calendar.
+                return
+            }
+            if (item.isBooking && item.bookingId != null) {
+                // Booking-union rows belong to THIS home — stash the home owner
+                // for the arg-less detail route (iOS parity:
+                // `.bookingDetail(owner: .home(homeId), …)`), else the detail
+                // screen falls back to a stale relay value or Personal.
+                bookingsOwnerRelay.pending = SchedulingOwner.Home(homeId)
+                onNavigate(SchedulingRoutes.bookingDetail(item.bookingId))
+            } else {
+                onOpenEvent(item.eventId ?: item.id)
+            }
+        }
+
+        /**
+         * True for the read-only task / bill / package due-date rows. The row
+         * carries its own kind, so this is a property of the row rather than a
+         * lookup — the screen uses the same signal to render it disabled.
+         */
+        internal fun isDerived(item: HomeAgendaItem): Boolean = item.derived != null
+
+        fun openWhosFree() {
+            onNavigate(SchedulingRoutes.WHOS_FREE)
+        }
+
+        fun onCreateAction(action: HomeCreateAction) {
+            when (action) {
+                HomeCreateAction.AddEvent -> onAddEvent()
+                HomeCreateAction.FindATime -> onNavigate(SchedulingRoutes.FIND_A_TIME)
+                // Carry this calendar's home so F9/F13 act on it, not an inferred one.
+                HomeCreateAction.BookResource -> onNavigate(SchedulingRoutes.resourceList(homeId))
+                HomeCreateAction.ScheduleVisit -> onNavigate(SchedulingRoutes.visitSetup(homeId))
+            }
+        }
+
+        fun addEvent() {
+            onAddEvent()
+        }
 
         // MARK: - Projection
 
-        @Suppress("ReturnCount")
         private fun rebuild() {
             val now = clock()
-            val parsed =
-                events.mapNotNull { dto ->
-                    val start = parseIsoInstant(dto.startAt) ?: return@mapNotNull null
-                    ParsedCalendarEvent(
-                        dto = dto,
-                        start = start,
-                        isoDate = isoDay(start),
-                    )
-                }.sortedBy { it.start }
-
-            // Every dated thing that belongs on this month's grid:
-            // calendar events plus task / bill / package due dates.
-            val agenda =
-                (
-                    parsed.map { AgendaEntry(it.start, it.isoDate, rowFor(it)) } +
-                        derived.mapNotNull { item ->
-                            val date = parseIsoInstant(item.dateIso) ?: return@mapNotNull null
-                            AgendaEntry(date, isoDay(date), rowForDerived(item))
-                        }
-                ).sortedBy { it.date }
-
-            _monthStrip.value = buildMonthStripState(agenda, now)
-
-            if (agenda.isEmpty()) {
-                _banner.value = null
-                _state.value =
-                    ListOfRowsUiState.Empty(
-                        icon = PantopusIcon.CalendarDays,
-                        headline = "No events scheduled",
-                        subcopy =
-                            "Plan chores, repairs, birthdays, and household milestones. " +
-                                "Members get notified automatically.",
-                        ctaTitle = "Add event",
-                        onCta = { onAddEvent() },
-                    )
-                return
-            }
-
-            val selected = selectedIsoDate
-            val filtered =
-                if (selected != null) {
-                    agenda.filter { it.isoDate == selected }
-                } else {
-                    agenda
-                }
-
-            if (selected != null && filtered.isEmpty()) {
-                _banner.value = null
-                _state.value =
-                    ListOfRowsUiState.Empty(
-                        icon = PantopusIcon.CalendarDays,
-                        headline = "Nothing on this day",
-                        subcopy = "Pick a different day or tap Today to see the full agenda.",
-                        ctaTitle = "Add event",
-                        onCta = { onAddEvent() },
-                    )
-                return
-            }
-
-            val sections = makeSections(filtered, now, selected)
-            _state.value = ListOfRowsUiState.Loaded(sections = sections, hasMore = false)
-            _banner.value = buildBanner(parsed, now)
-        }
-
-        private fun buildBanner(
-            parsed: List<ParsedCalendarEvent>,
-            now: Instant,
-        ): BannerConfig? {
-            val summary = summarize(parsed, now, zone)
-            if (!summary.hasContent) return null
-            return BannerConfig(
-                icon = PantopusIcon.CalendarDays,
-                title = summary.title,
-                subtitle = summary.subtitle,
-                tint = BannerCtaTint.Home,
-                cta =
-                    BannerCta(
-                        label = "Today",
-                        accessibilityLabel = "Jump to today",
-                        tint = BannerCtaTint.Home,
-                        onClick = { jumpToToday() },
-                    ),
-            )
-        }
-
-        private fun buildMonthStripState(
-            entries: List<AgendaEntry>,
-            now: Instant,
-        ): MonthStripState {
-            val dotCounts = mutableMapOf<String, Int>()
-            for (entry in entries) {
-                dotCounts[entry.isoDate] = (dotCounts[entry.isoDate] ?: 0) + 1
-            }
-            val monthFmt = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.US)
-            val dowFmt = DateTimeFormatter.ofPattern("EEE", Locale.US)
-            val days =
-                (0 until 7).map { offset ->
-                    val date = weekAnchor.plusDays(offset.toLong())
-                    val iso = date.format(DateTimeFormatter.ISO_DATE)
-                    MonthStripState.Day(
-                        id = iso,
-                        dayOfWeek = dowFmt.format(date),
-                        date = date.dayOfMonth,
-                        eventCount = dotCounts[iso] ?: 0,
-                    )
-                }
-            return MonthStripState(
-                monthLabel = monthFmt.format(weekAnchor),
-                days = days,
-                selectedIsoDate = selectedIsoDate,
-                todayIsoDate = now.atZone(zone).toLocalDate().format(DateTimeFormatter.ISO_DATE),
-            )
-        }
-
-        /**
-         * Bucket the agenda into "Today / Tomorrow / day-name / Next
-         * week / Later". Works over already-projected rows so calendar
-         * events and derived task / bill / package due dates share one
-         * grouping pass.
-         */
-        @Suppress("LongParameterList")
-        internal fun makeSections(
-            entries: List<AgendaEntry>,
-            now: Instant,
-            selectedIsoDate: String?,
-        ): List<RowSection> {
-            val todayStart = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
-            val tomorrowStart =
-                now.atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant()
-            val dayAfterTomorrowStart =
-                now.atZone(zone).toLocalDate().plusDays(2).atStartOfDay(zone).toInstant()
-            val nextWeekStart =
-                now.atZone(zone).toLocalDate().plusDays(7).atStartOfDay(zone).toInstant()
-            val twoWeeksOut =
-                now.atZone(zone).toLocalDate().plusDays(14).atStartOfDay(zone).toInstant()
-
-            if (selectedIsoDate != null) {
-                return listOf(
-                    RowSection(
-                        id = "day-$selectedIsoDate",
-                        header = dayHeader(selectedIsoDate),
-                        rows = entries.map { it.row },
-                    ),
+            // Every dated thing that belongs on this week's strip and in the
+            // agenda: calendar events plus task / bill / package due dates.
+            val agenda = events + derivedRows
+            _monthStrip.value =
+                HomeAgendaBuilder.weekStrip(
+                    events = agenda,
+                    anchorIso = weekAnchorIso,
+                    selectedIso = selectedIsoDate,
+                    now = now,
+                    zone = zone,
                 )
-            }
-
-            val today = mutableListOf<RowModel>()
-            val tomorrow = mutableListOf<RowModel>()
-            val thisWeek = mutableListOf<Pair<Instant, RowModel>>()
-            val nextWeek = mutableListOf<RowModel>()
-            val later = mutableListOf<RowModel>()
-
-            for (entry in entries) {
-                if (entry.date.isBefore(todayStart)) continue
-                val row = entry.row
-                when {
-                    entry.date.isBefore(tomorrowStart) -> today.add(row)
-                    entry.date.isBefore(dayAfterTomorrowStart) -> tomorrow.add(row)
-                    entry.date.isBefore(nextWeekStart) -> thisWeek.add(entry.date to row)
-                    entry.date.isBefore(twoWeeksOut) -> nextWeek.add(row)
-                    else -> later.add(row)
+            val onlyUser =
+                when (val filter = _memberFilter.value) {
+                    MemberFilter.All -> null
+                    MemberFilter.Mine -> resolvedUserId
+                    is MemberFilter.Member -> filter.id
                 }
-            }
-
-            val sections = mutableListOf<RowSection>()
-            if (today.isNotEmpty()) {
-                sections.add(RowSection(id = "today", header = "Today", rows = today))
-            }
-            if (tomorrow.isNotEmpty()) {
-                sections.add(RowSection(id = "tomorrow", header = "Tomorrow", rows = tomorrow))
-            }
-            if (thisWeek.isNotEmpty()) {
-                val grouped = thisWeek.groupBy { isoDay(it.first) }
-                grouped.keys.sorted().forEach { iso ->
-                    val bucket = grouped[iso] ?: return@forEach
-                    sections.add(
-                        RowSection(
-                            id = "thisweek-$iso",
-                            header = dayHeader(iso),
-                            rows = bucket.map { it.second },
-                        ),
-                    )
-                }
-            }
-            if (nextWeek.isNotEmpty()) {
-                sections.add(RowSection(id = "nextweek", header = "Next week", rows = nextWeek))
-            }
-            if (later.isNotEmpty()) {
-                sections.add(RowSection(id = "later", header = "Later", rows = later))
-            }
-            return sections
+            val sections =
+                HomeAgendaBuilder.sections(
+                    events = agenda,
+                    members = membersMap,
+                    now = now,
+                    zone = zone,
+                    selectedIsoDate = selectedIsoDate,
+                    onlyUserId = onlyUser,
+                    derived = derivedIndex,
+                )
+            _state.value = HomeCalendarUiState.Loaded(sections = sections, empty = resolveEmpty(sections))
         }
 
-        private fun rowFor(event: ParsedCalendarEvent): RowModel {
-            val category = CalendarEventCategory.from(event.dto.eventType)
-            val timeLabel = formatTime(event.start, event.dto.endAt)
-            val timeRangeLabel = formatTimeRange(event.start, event.dto.endAt)
-            val metaParts =
-                listOfNotNull(
-                    event.dto.locationNotes,
-                    recurrenceShortLabel(event.dto.recurrenceRule),
-                ).filter { it.isNotEmpty() }
-            val subtitle =
-                if (metaParts.isEmpty()) {
-                    timeRangeLabel
-                } else {
-                    "$timeRangeLabel · ${metaParts.joinToString(" · ")}"
-                }
-            val attendeeCount = event.dto.assignedTo?.size ?: 0
-            val chips =
-                buildList {
-                    add(
-                        RowChip(
-                            text = category.label,
-                            icon = category.icon,
-                            tint =
-                                RowChip.Tint.Custom(
-                                    background = category.background,
-                                    foreground = category.foreground,
-                                ),
-                        ),
-                    )
-                    if (attendeeCount > 0) {
-                        add(
-                            RowChip(
-                                text = if (attendeeCount == 1) "1 attendee" else "$attendeeCount attendees",
-                                icon = PantopusIcon.Users,
-                                tint = RowChip.Tint.Status(StatusChipVariant.Neutral),
-                            ),
-                        )
-                    }
-                }
-            return RowModel(
-                id = event.dto.id,
-                title = event.dto.title,
-                subtitle = subtitle,
-                template = RowTemplate.StatusChip,
-                leading =
-                    RowLeading.TypeIcon(
-                        icon = category.icon,
-                        background = category.background,
-                        foreground = category.foreground,
-                    ),
-                trailing = RowTrailing.None,
-                onTap = { onOpenEvent(event.dto.id) },
-                body = event.dto.description,
-                chips = chips,
-                timeMeta = timeLabel,
-            )
-        }
-
-        /**
-         * Row projection for a derived due-date. Read-only — these rows
-         * mirror surfaces that own their own screens, so tapping is a
-         * no-op exactly as in RN's calendar.
-         */
-        private fun rowForDerived(item: HomeCalendarDerivedItem): RowModel {
-            val start = parseIsoInstant(item.dateIso)
-            return RowModel(
-                id = item.id,
-                title = item.title,
-                subtitle = item.detail ?: item.kind.label,
-                template = RowTemplate.StatusChip,
-                leading =
-                    RowLeading.TypeIcon(
-                        icon = item.kind.icon,
-                        background = item.kind.background,
-                        foreground = item.kind.foreground,
-                    ),
-                trailing = RowTrailing.None,
-                chips =
-                    listOf(
-                        RowChip(
-                            text = item.kind.label,
-                            icon = item.kind.icon,
-                            tint =
-                                RowChip.Tint.Custom(
-                                    background = item.kind.background,
-                                    foreground = item.kind.foreground,
-                                ),
-                        ),
-                    ),
-                timeMeta = start?.let { formatTime(it, null) },
-            )
-        }
-
-        // MARK: - Date helpers
-
-        private fun isoDay(instant: Instant): String = instant.atZone(zone).toLocalDate().format(DateTimeFormatter.ISO_DATE)
-
-        private fun parseIsoDate(iso: String): LocalDate? = runCatching { LocalDate.parse(iso) }.getOrNull()
-
-        /** First day of the week (Sunday) containing [date]. */
-        private fun weekAnchorFor(date: LocalDate): LocalDate {
-            val daysBack =
-                when (date.dayOfWeek) {
-                    DayOfWeek.SUNDAY -> 0
-                    DayOfWeek.MONDAY -> 1
-                    DayOfWeek.TUESDAY -> 2
-                    DayOfWeek.WEDNESDAY -> 3
-                    DayOfWeek.THURSDAY -> 4
-                    DayOfWeek.FRIDAY -> 5
-                    DayOfWeek.SATURDAY -> 6
-                }
-            return date.minusDays(daysBack.toLong())
-        }
-
-        private fun formatTime(
-            start: Instant,
-            endIso: String?,
-        ): String {
-            val zoned = start.atZone(zone)
-            if (endIso == null && isAllDay(zoned)) return "All day"
-            return DateTimeFormatter.ofPattern("h:mm a", Locale.US).format(zoned)
-        }
-
-        private fun formatTimeRange(
-            start: Instant,
-            endIso: String?,
-        ): String {
-            val zoned = start.atZone(zone)
-            val end = endIso?.let(::parseIsoInstant)?.atZone(zone)
-            val fmt = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
-            val startLabel = fmt.format(zoned)
-            if (end == null) {
-                return if (isAllDay(zoned)) "All day" else startLabel
-            }
-            return "$startLabel – ${fmt.format(end)}"
-        }
-
-        private fun isAllDay(zoned: ZonedDateTime): Boolean = zoned.hour == 0 && zoned.minute == 0 && zoned.second == 0
-
-        private fun dayHeader(iso: String): String {
-            val parsed = parseIsoDate(iso) ?: return iso
-            return DateTimeFormatter.ofPattern("EEE MMM d", Locale.US).format(parsed)
-        }
-
-        enum class WeekShift {
-            Previous,
-            Next,
-        }
-
-        companion object {
-            fun parseIsoInstant(iso: String?): Instant? {
-                if (iso.isNullOrBlank()) return null
-                return runCatching { Instant.parse(iso) }
-                    .recoverCatching {
-                        // Bare yyyy-MM-dd fallback for all-day rows.
-                        LocalDate
-                            .parse(iso)
-                            .atStartOfDay(ZoneId.of("UTC"))
-                            .toInstant()
-                    }.getOrNull()
-            }
-
-            /** Pure summary projection — exposed for tests. */
-            @JvmStatic
-            fun summarize(
-                events: List<ParsedCalendarEvent>,
-                now: Instant,
-                zone: ZoneId,
-            ): HomeCalendarBannerSummary {
-                if (events.isEmpty()) return HomeCalendarBannerSummary(count = 0, nextLabel = null)
-                val weekStart = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
-                val weekEnd =
-                    now.atZone(zone).toLocalDate().plusDays(7).atStartOfDay(zone).toInstant()
-                var thisWeek = 0
-                var next: ParsedCalendarEvent? = null
-                for (ev in events) {
-                    if (!ev.start.isBefore(weekStart) && ev.start.isBefore(weekEnd)) {
-                        thisWeek += 1
-                    }
-                    if (!ev.start.isBefore(now) && next == null) {
-                        next = ev
-                    }
-                }
-                val nextLabel =
-                    next?.let { ev ->
-                        val category = CalendarEventCategory.from(ev.dto.eventType)
-                        val timeLabel = nextTimeLabel(ev.start, now, zone)
-                        "${ev.dto.title} · $timeLabel (${category.label})"
-                    }
-                return HomeCalendarBannerSummary(count = thisWeek, nextLabel = nextLabel)
-            }
-
-            private fun nextTimeLabel(
-                start: Instant,
-                now: Instant,
-                zone: ZoneId,
-            ): String {
-                val nowDay = now.atZone(zone).toLocalDate()
-                val evDay = start.atZone(zone).toLocalDate()
-                val days = Duration.between(nowDay.atStartOfDay(zone), evDay.atStartOfDay(zone)).toDays()
-                val timeFmt = DateTimeFormatter.ofPattern("h:mm a", Locale.US).withZone(zone)
-                val timeStr = timeFmt.format(start)
-                return when (days) {
-                    0L -> "$timeStr today"
-                    1L -> "$timeStr tomorrow"
-                    else -> {
-                        val dayFmt = DateTimeFormatter.ofPattern("EEE MMM d", Locale.US).withZone(zone)
-                        "$timeStr · ${dayFmt.format(start)}"
-                    }
-                }
-            }
-
-            /**
-             * Light human-readable label for an RRULE string. Mirrors iOS
-             * `HomeCalendarViewModel.recurrenceShortLabel`.
-             */
-            fun recurrenceShortLabel(rrule: String?): String? {
-                if (rrule.isNullOrEmpty()) return null
-                val upper = rrule.uppercase(Locale.ROOT)
-                return when {
-                    "FREQ=WEEKLY" in upper -> "Repeats weekly"
-                    "FREQ=YEARLY" in upper -> "Repeats yearly"
-                    "FREQ=MONTHLY" in upper -> "Repeats monthly"
-                    "FREQ=DAILY" in upper -> "Repeats daily"
-                    else -> "Repeats"
-                }
+        private fun resolveEmpty(sections: List<HomeAgendaSection>): AgendaEmpty? {
+            if (sections.isNotEmpty()) return null
+            if (events.isEmpty() && derivedRows.isEmpty()) return AgendaEmpty.FirstRun
+            return when (val filter = _memberFilter.value) {
+                is MemberFilter.Member -> AgendaEmpty.FilteredMember(filter.name)
+                MemberFilter.Mine -> AgendaEmpty.FilteredMember("you")
+                MemberFilter.All -> if (selectedIsoDate != null) AgendaEmpty.FilteredDay else AgendaEmpty.FirstRun
             }
         }
+
+        private fun signedInUserId(): String? = (authRepository.state.value as? AuthRepository.State.SignedIn)?.user?.id
+
+        enum class WeekShift { Previous, Next }
     }

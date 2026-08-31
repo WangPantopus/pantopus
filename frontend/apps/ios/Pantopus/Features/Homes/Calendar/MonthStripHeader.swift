@@ -4,19 +4,21 @@
 //
 //  T6.4c — Small "month label + 7-day week strip" calendar component
 //  rendered between the top bar and the agenda list on the Home calendar.
-//  Lifted from the design at `calendar-frames.jsx:118-195`.
+//  Mirrors the design's `home-shell.jsx` `MonthStrip` primitive.
 //
 //  Per the design contract, this component lives in the feature folder
 //  (NOT the shared shell) — it's specific to the calendar surface, and
 //  the shell's `customHeader` slot (added in T6.4c) hosts it.
 //
-//  Geometry:
-//    - Container: surface bg + 1px bottom border, padding 10/16/12.
-//    - Row 1: month label + prev/next chevrons (26pt rounded buttons).
-//    - Row 2: 7 day columns in a HStack, each rendering DOW abbrev +
-//      date number + up to 3 event dots below.
-//    - Today / selected day: home-green pill background; 4pt white dots.
-//    - Other days: transparent background; 4pt home-green dots.
+//  Geometry (home-shell `MonthStrip`):
+//    - Container: surface bg + 1px bottom border, padding 8/10/10.
+//    - Row 1: bold month label + plain prev/next chevrons (17pt glyphs,
+//      muted/secondary tint — no button chrome).
+//    - Row 2: 7 day columns in an HStack, each rendering a single-letter
+//      weekday initial + a 30×30 date number.
+//    - Selected day: 30×30 home-green circle, white number.
+//    - Today (not selected): 30×30 transparent circle with a 1.5pt
+//      home-green ring. No event-count dots (the home-shell strip drops them).
 //
 
 import SwiftUI
@@ -54,12 +56,13 @@ public struct MonthStripState: Sendable, Equatable {
     public struct Day: Sendable, Equatable, Identifiable {
         /// ISO yyyy-MM-dd. Used as `id` + comparison key.
         public let id: String
-        /// Abbreviated day of week — "Sun" / "Mon" / …
+        /// Single-letter weekday initial — "S" / "M" / "T" / …
         public let dayOfWeek: String
-        /// 1-based date number rendered below the DOW abbreviation.
+        /// 1-based date number rendered below the weekday initial.
         public let date: Int
-        /// Number of events scheduled on this day. The strip renders
-        /// `min(count, 3)` small dots below the date.
+        /// Number of events scheduled on this day. Retained for the host
+        /// VM's projection + tests; the home-shell strip no longer renders
+        /// per-day event dots.
         public let eventCount: Int
 
         public init(id: String, dayOfWeek: String, date: Int, eventCount: Int) {
@@ -92,13 +95,13 @@ public struct MonthStripHeader: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 7) {
             monthRow
             weekRow
         }
-        .padding(.horizontal, Spacing.s4)
-        .padding(.top, 10)
-        .padding(.bottom, Spacing.s3)
+        .padding(.horizontal, 10)
+        .padding(.top, Spacing.s2)
+        .padding(.bottom, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
@@ -111,19 +114,20 @@ public struct MonthStripHeader: View {
 
     private var monthRow: some View {
         HStack(spacing: Spacing.s1) {
-            HStack(spacing: Spacing.s1) {
-                Text(state.monthLabel)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appText)
-                Icon(.chevronDown, size: 12, color: Theme.Color.appTextSecondary)
-            }
-            .accessibilityIdentifier("homeCalendar_monthLabel")
+            Text(state.monthLabel)
+                .font(.system(size: 13, weight: .bold))
+                .tracking(-0.2)
+                .foregroundStyle(Theme.Color.appText)
+                .accessibilityIdentifier("homeCalendar_monthLabel")
             Spacer()
-            chevronButton(.chevronLeft, label: "Previous month", handler: onPrevMonth)
-                .accessibilityIdentifier("homeCalendar_prevMonth")
-            chevronButton(.chevronRight, label: "Next month", handler: onNextMonth)
-                .accessibilityIdentifier("homeCalendar_nextMonth")
+            HStack(spacing: 2) {
+                chevronButton(.chevronLeft, label: "Previous month", handler: onPrevMonth)
+                    .accessibilityIdentifier("homeCalendar_prevMonth")
+                chevronButton(.chevronRight, label: "Next month", handler: onNextMonth)
+                    .accessibilityIdentifier("homeCalendar_nextMonth")
+            }
         }
+        .padding(.horizontal, Spacing.s1)
     }
 
     private func chevronButton(
@@ -131,20 +135,27 @@ public struct MonthStripHeader: View {
         label: String,
         handler: @escaping @MainActor () -> Void
     ) -> some View {
+        // Design renders these as plain glyphs (no button chrome): prev tinted
+        // `N.fg4` (muted), next `N.fg3` (secondary), 17pt. Kept tappable.
         Button {
             handler()
         } label: {
-            Icon(icon, size: 14, color: Theme.Color.appTextStrong)
-                .frame(width: 26, height: 26)
-                .background(Theme.Color.appSurfaceSunken)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+            Icon(
+                icon,
+                size: 17,
+                color: icon == .chevronLeft
+                    ? Theme.Color.appTextMuted
+                    : Theme.Color.appTextSecondary
+            )
+            .frame(width: 26, height: 26)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
     }
 
     private var weekRow: some View {
-        HStack(spacing: Spacing.s1) {
+        HStack(spacing: 2) {
             ForEach(state.days) { day in
                 dayCell(day)
                     .frame(maxWidth: .infinity)
@@ -153,63 +164,43 @@ public struct MonthStripHeader: View {
     }
 
     private func dayCell(_ day: MonthStripState.Day) -> some View {
-        let isHighlighted = isHighlighted(day)
+        let selected = isSelected(day)
+        let isToday = day.id == state.todayIsoDate
         return Button {
             onSelectDay(day.id)
         } label: {
-            VStack(spacing: 3) {
-                Text(day.dayOfWeek.uppercased())
+            VStack(spacing: 4) {
+                Text(day.dayOfWeek)
                     .font(.system(size: 10, weight: .semibold))
-                    .tracking(0.4)
-                    .foregroundStyle(
-                        isHighlighted
-                            ? Color.white.opacity(0.85)
-                            : Theme.Color.appTextMuted
-                    )
+                    .foregroundStyle(Theme.Color.appTextMuted)
                 Text("\(day.date)")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 13, weight: selected ? .bold : .semibold))
                     .foregroundStyle(
-                        isHighlighted
-                            ? Theme.Color.appTextInverse
-                            : Theme.Color.appText
+                        selected ? Theme.Color.appTextInverse : Theme.Color.appText
                     )
-                dotsRow(eventCount: day.eventCount, isHighlighted: isHighlighted)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        Circle().fill(selected ? Theme.Color.home : Color.clear)
+                    )
+                    .overlay(
+                        Circle()
+                            .strokeBorder(
+                                isToday && !selected ? Theme.Color.home : Color.clear,
+                                lineWidth: 1.5
+                            )
+                    )
             }
-            .padding(.vertical, 6)
             .frame(maxWidth: .infinity)
-            .background(
-                isHighlighted ? Theme.Color.home : Color.clear
-            )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("homeCalendar_day_\(day.id)")
-        .accessibilityLabel(
-            "\(day.dayOfWeek) \(day.date) · \(day.eventCount) events"
-        )
-        .accessibilityAddTraits(isHighlighted ? [.isButton, .isSelected] : .isButton)
+        .accessibilityLabel("\(day.dayOfWeek) \(day.date)")
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 
-    private func dotsRow(eventCount: Int, isHighlighted: Bool) -> some View {
-        HStack(spacing: 2) {
-            ForEach(0..<min(eventCount, 3), id: \.self) { _ in
-                Circle()
-                    .fill(
-                        isHighlighted
-                            ? Color.white.opacity(0.9)
-                            : Theme.Color.home
-                    )
-                    .frame(width: 4, height: 4)
-            }
-        }
-        .frame(height: 4)
-    }
-
-    /// A day is highlighted (home-green pill) when either it is the
-    /// user-selected day, or — if there is no selection — when it is
-    /// today. Mirrors the design's "today is a pill" default plus the
-    /// "tapping a day pins the pill" interaction.
-    private func isHighlighted(_ day: MonthStripState.Day) -> Bool {
+    /// The selected-day pill is the user-selected day, or — when nothing is
+    /// selected — today (today otherwise renders a green ring, not a fill).
+    private func isSelected(_ day: MonthStripState.Day) -> Bool {
         if let selected = state.selectedIsoDate {
             return day.id == selected
         }
@@ -220,13 +211,13 @@ public struct MonthStripHeader: View {
 #Preview {
     let today = "2025-10-12"
     let week: [MonthStripState.Day] = [
-        .init(id: "2025-10-12", dayOfWeek: "Sun", date: 12, eventCount: 3),
-        .init(id: "2025-10-13", dayOfWeek: "Mon", date: 13, eventCount: 1),
-        .init(id: "2025-10-14", dayOfWeek: "Tue", date: 14, eventCount: 2),
-        .init(id: "2025-10-15", dayOfWeek: "Wed", date: 15, eventCount: 1),
-        .init(id: "2025-10-16", dayOfWeek: "Thu", date: 16, eventCount: 0),
-        .init(id: "2025-10-17", dayOfWeek: "Fri", date: 17, eventCount: 1),
-        .init(id: "2025-10-18", dayOfWeek: "Sat", date: 18, eventCount: 2)
+        .init(id: "2025-10-12", dayOfWeek: "S", date: 12, eventCount: 3),
+        .init(id: "2025-10-13", dayOfWeek: "M", date: 13, eventCount: 1),
+        .init(id: "2025-10-14", dayOfWeek: "T", date: 14, eventCount: 2),
+        .init(id: "2025-10-15", dayOfWeek: "W", date: 15, eventCount: 1),
+        .init(id: "2025-10-16", dayOfWeek: "T", date: 16, eventCount: 0),
+        .init(id: "2025-10-17", dayOfWeek: "F", date: 17, eventCount: 1),
+        .init(id: "2025-10-18", dayOfWeek: "S", date: 18, eventCount: 2)
     ]
     MonthStripHeader(
         state: MonthStripState(

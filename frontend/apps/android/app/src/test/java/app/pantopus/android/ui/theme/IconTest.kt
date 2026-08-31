@@ -286,6 +286,51 @@ class IconTest {
             // Magic Task wizard — voice-note describe card + One-time engagement tile.
             "mic",
             "circle-dot",
+            // Calendarly scheduling — terminal/conflict/waitlist glyphs and the
+            // setup/payments cluster (percent / statement-descriptor type),
+            // plus the shared-primitive additions (scale / list-ordered /
+            // package-open / user-x / workflow) and the Calendarly brand marks
+            // (calendarly / qr-code / ticket / concentric ring).
+            "calendar-x",
+            "search-x",
+            "pause-circle",
+            "bell-plus",
+            "percent",
+            "type",
+            "calendarly",
+            "qr-code",
+            "ticket",
+            "scale",
+            "list-ordered",
+            "package-open",
+            "user-x",
+            "concentric",
+            // H2 Workflows List empty-state hero — branching-node automation graph.
+            "workflow",
+            // G8 packages-list row/empty/payouts-gate icon (Lucide `layers`).
+            // G10 EligibleRow tick icon (Lucide `ticket-check`).
+            "layers",
+            "ticket-check",
+            // F15 — "Ask to manage" pill icon (shield with plus).
+            "shield-plus",
+            // F8 — Quiet-hours DisclosureRow icon (crescent moon).
+            "moon",
+            // A1 Scheduling Hub manage-row glyphs + B8 Connected calendars.
+            // Design: scheduling-hub-frames.jsx / connected-calendars-frames.jsx.
+            "calendar-sync",
+            "layout-grid",
+            "settings",
+            // A1 identity switcher Business pill + A5 summary card owner glyph.
+            "store",
+            // F1 Home calendar filtered-empty state (no events match the filters).
+            "calendar-search",
+            // B1 event-type list reorder-mode hint bar (event-types-frames.jsx FRAME 6).
+            "move",
+            // B9 date overrides — range link + blocked-day rows (date-overrides-frames.jsx).
+            "calendar-range",
+            "calendar-off",
+            // G2 collective setup explainer note (collective-frames.jsx EXPLAIN).
+            "git-merge",
         )
 
     @Test

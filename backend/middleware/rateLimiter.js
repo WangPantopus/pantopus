@@ -60,7 +60,10 @@ const homeCreationLimiter = rateLimit({
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   keyGenerator: (req) => req.user?.id || req.ip,
-  skip: (req) => req.method !== 'POST' || req.path === '/check-address',
+  // The '/:homeId/scheduling/**' skip matters: this limiter is mounted on ALL of /api/homes,
+  // so without it every home-scoped Calendarly POST (create event type, block, workflow…)
+  // burned the 5-per-hour home-CREATION budget and 429'd ordinary scheduling setup.
+  skip: (req) => req.method !== 'POST' || req.path === '/check-address' || /^\/[^/]+\/scheduling(\/|$)/.test(req.path),
   message: { error: 'Too many home creation requests. Please try again later.' },
 });
 
@@ -125,19 +128,19 @@ const authEndpointLimiter = rateLimit({
  *
  * CST-01: these endpoints are thin proxies in front of a per-request billed
  * geocoding API. They were mounted unauthenticated and unmetered, so anyone
- * with curl could run up the bill indefinitely (denial-of-wallet). Mounted
- * after verifyToken so the key is a user id rather than a rotatable IP.
+ * with curl could run up the bill indefinitely (denial-of-wallet).
+ *
+ * The meter, not authentication, is the control: /geo/autocomplete and
+ * /geo/resolve carry the signed-out acquisition funnel (the public /start page
+ * and both native launch screens) and cannot require a session.
+ *
+ * The budget is per hour. A debounced typeahead spends roughly one call per
+ * two keystrokes past the 3-character minimum, so entering one address costs
+ * ~5-15 calls: a flat 60 locked a signed-in user out after four or five
+ * addresses, which the Add Home wizard alone can reach. Signed-in callers are
+ * individually accountable and get a realistic budget; anonymous callers share
+ * an IP bucket and get a tighter one.
  */
-// CST-01: the meter, not authentication, is the denial-of-wallet control on the
-// billed geocoder — /geo/autocomplete and /geo/resolve carry the signed-out
-// acquisition funnel and cannot require a session.
-//
-// The budget is per hour. A debounced typeahead spends roughly one call per
-// two keystrokes past the 3-character minimum, so entering one address costs
-// ~5-15 calls: a flat 60 locked a signed-in user out after four or five
-// addresses, which the Add Home wizard alone can reach. Signed-in callers are
-// individually accountable and get a realistic budget; anonymous callers share
-// an IP bucket and get a tighter one.
 const geocodeLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   limit: (req) => (req.user?.id ? 300 : 60),
@@ -291,10 +294,26 @@ const residencyLetterIssueLimiter = rateLimit({
   message: { error: 'Too many letters issued today. Please try again tomorrow.' },
 });
 
+/**
+ * Limiter for public (unauthenticated) Calendarly booking writes — create / reschedule / cancel
+ * via /api/public/book and /api/public/booking. Tighter than the read previewLimiter and keyed
+ * per-user-or-IP, since these create rows, fire payment intents, and send email. Skips reads.
+ */
+const bookingWriteLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  skip: (req) => req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS',
+  message: { error: 'Too many booking requests. Please try again shortly.' },
+});
+
 module.exports = {
   geocodeLimiter,
   globalWriteLimiter,
   financialWriteLimiter,
+  bookingWriteLimiter,
   contentCreationLimiter,
   homeCreationLimiter,
   ownershipClaimLimiter,

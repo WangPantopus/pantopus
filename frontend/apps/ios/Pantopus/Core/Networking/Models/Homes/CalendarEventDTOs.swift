@@ -30,6 +30,23 @@ public struct CalendarEventDTO: Decodable, Sendable, Hashable, Identifiable {
     public let createdAt: String?
     public let updatedAt: String?
 
+    /// Calendarly booking-union + migration-164 fields (all Optional so existing
+    /// decodes still pass). Consumed read-only by I10 (Home calendar & RSVP) and
+    /// I12 (resources/visits calendar union).
+    /// `private` | `members` | `public_preview` (migration 164).
+    public let visibility: String?
+    /// `event` | `booking` — the booking-union marker. Booking rows are merged
+    /// in at query time and are NEVER persisted as HomeCalendarEvent rows.
+    public let source: String?
+    /// `pending` | `confirmed` — only present when `source == "booking"`.
+    public let bookingStatus: String?
+    /// The originating booking id — only present when `source == "booking"`.
+    public let bookingId: String?
+    /// Whether the event requests RSVPs (migration 164).
+    public let requestRsvp: Bool?
+    /// Per-event reminder offsets (jsonb array; migration 164).
+    public let reminders: [JSONValue]?
+
     enum CodingKeys: String, CodingKey {
         case id
         case homeId = "home_id"
@@ -45,6 +62,12 @@ public struct CalendarEventDTO: Decodable, Sendable, Hashable, Identifiable {
         case createdBy = "created_by"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case visibility
+        case source
+        case bookingStatus = "booking_status"
+        case bookingId = "booking_id"
+        case requestRsvp = "request_rsvp"
+        case reminders
     }
 
     public init(
@@ -61,7 +84,13 @@ public struct CalendarEventDTO: Decodable, Sendable, Hashable, Identifiable {
         alertsEnabled: Bool? = nil,
         createdBy: String? = nil,
         createdAt: String? = nil,
-        updatedAt: String? = nil
+        updatedAt: String? = nil,
+        visibility: String? = nil,
+        source: String? = nil,
+        bookingStatus: String? = nil,
+        bookingId: String? = nil,
+        requestRsvp: Bool? = nil,
+        reminders: [JSONValue]? = nil
     ) {
         self.id = id
         self.homeId = homeId
@@ -77,6 +106,12 @@ public struct CalendarEventDTO: Decodable, Sendable, Hashable, Identifiable {
         self.createdBy = createdBy
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.visibility = visibility
+        self.source = source
+        self.bookingStatus = bookingStatus
+        self.bookingId = bookingId
+        self.requestRsvp = requestRsvp
+        self.reminders = reminders
     }
 }
 
@@ -102,6 +137,10 @@ public struct CreateHomeEventRequest: Encodable, Sendable {
     public let recurrenceRule: String?
     public let assignedTo: [String]?
     public let alertsEnabled: Bool?
+    /// Migration-164: request RSVPs for this event.
+    public let requestRsvp: Bool?
+    /// Migration-164: per-event reminder offsets (jsonb array).
+    public let reminders: [JSONValue]?
 
     enum CodingKeys: String, CodingKey {
         case eventType = "event_type"
@@ -113,6 +152,8 @@ public struct CreateHomeEventRequest: Encodable, Sendable {
         case recurrenceRule = "recurrence_rule"
         case assignedTo = "assigned_to"
         case alertsEnabled = "alerts_enabled"
+        case requestRsvp = "request_rsvp"
+        case reminders
     }
 
     public init(
@@ -124,7 +165,9 @@ public struct CreateHomeEventRequest: Encodable, Sendable {
         locationNotes: String? = nil,
         recurrenceRule: String? = nil,
         assignedTo: [String]? = nil,
-        alertsEnabled: Bool? = nil
+        alertsEnabled: Bool? = nil,
+        requestRsvp: Bool? = nil,
+        reminders: [JSONValue]? = nil
     ) {
         self.eventType = eventType
         self.title = title
@@ -135,6 +178,8 @@ public struct CreateHomeEventRequest: Encodable, Sendable {
         self.recurrenceRule = recurrenceRule
         self.assignedTo = assignedTo
         self.alertsEnabled = alertsEnabled
+        self.requestRsvp = requestRsvp
+        self.reminders = reminders
     }
 }
 
@@ -151,6 +196,10 @@ public struct UpdateHomeEventRequest: Encodable, Sendable {
     public let recurrenceRule: String?
     public let assignedTo: [String]?
     public let alertsEnabled: Bool?
+    /// Migration-164: request RSVPs for this event.
+    public let requestRsvp: Bool?
+    /// Migration-164: per-event reminder offsets (jsonb array).
+    public let reminders: [JSONValue]?
 
     enum CodingKeys: String, CodingKey {
         case eventType = "event_type"
@@ -162,6 +211,8 @@ public struct UpdateHomeEventRequest: Encodable, Sendable {
         case recurrenceRule = "recurrence_rule"
         case assignedTo = "assigned_to"
         case alertsEnabled = "alerts_enabled"
+        case requestRsvp = "request_rsvp"
+        case reminders
     }
 
     public init(
@@ -173,7 +224,9 @@ public struct UpdateHomeEventRequest: Encodable, Sendable {
         locationNotes: String? = nil,
         recurrenceRule: String? = nil,
         assignedTo: [String]? = nil,
-        alertsEnabled: Bool? = nil
+        alertsEnabled: Bool? = nil,
+        requestRsvp: Bool? = nil,
+        reminders: [JSONValue]? = nil
     ) {
         self.eventType = eventType
         self.title = title
@@ -184,6 +237,8 @@ public struct UpdateHomeEventRequest: Encodable, Sendable {
         self.recurrenceRule = recurrenceRule
         self.assignedTo = assignedTo
         self.alertsEnabled = alertsEnabled
+        self.requestRsvp = requestRsvp
+        self.reminders = reminders
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -199,10 +254,66 @@ public struct UpdateHomeEventRequest: Encodable, Sendable {
         if let recurrenceRule { try c.encode(recurrenceRule, forKey: .recurrenceRule) }
         if let assignedTo { try c.encode(assignedTo, forKey: .assignedTo) }
         if let alertsEnabled { try c.encode(alertsEnabled, forKey: .alertsEnabled) }
+        if let requestRsvp { try c.encode(requestRsvp, forKey: .requestRsvp) }
+        if let reminders { try c.encode(reminders, forKey: .reminders) }
     }
 }
 
 /// Envelope for `POST /api/homes/:id/events` and `PUT …/:eventId`.
 public struct HomeEventResponse: Decodable, Sendable {
     public let event: CalendarEventDTO
+}
+
+/// One RSVP attendee row from `GET /api/homes/:id/events/:eventId` — the
+/// endpoint returns only `user_id`, `rsvp_status`, and `updated_at`. Consumed
+/// read-only by I10 (Home Event Detail + RSVP).
+public struct HomeEventAttendeeDTO: Decodable, Sendable, Hashable, Identifiable {
+    public let userId: String
+    /// `pending` | `going` | `maybe` | `declined`.
+    public let rsvpStatus: String?
+    public let updatedAt: String?
+
+    /// `Identifiable` keyed by the attendee's user id (one RSVP row per user).
+    public var id: String {
+        userId
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case rsvpStatus = "rsvp_status"
+        case updatedAt = "updated_at"
+    }
+
+    public init(userId: String, rsvpStatus: String? = nil, updatedAt: String? = nil) {
+        self.userId = userId
+        self.rsvpStatus = rsvpStatus
+        self.updatedAt = updatedAt
+    }
+}
+
+/// `GET /api/homes/:id/events/:eventId` → event detail + RSVP attendees.
+public struct HomeEventDetailResponse: Decodable, Sendable {
+    public let event: CalendarEventDTO
+    public let attendees: [HomeEventAttendeeDTO]
+
+    public init(event: CalendarEventDTO, attendees: [HomeEventAttendeeDTO]) {
+        self.event = event
+        self.attendees = attendees
+    }
+}
+
+/// `POST /api/homes/:id/events/:eventId/rsvp` → `{ attendee }` (only `user_id`
+/// + `rsvp_status` are returned).
+public struct HomeEventRsvpResponse: Decodable, Sendable {
+    public let attendee: HomeEventAttendeeDTO
+}
+
+/// Body for `POST /api/homes/:id/events/:eventId/rsvp`.
+public struct HomeEventRsvpRequest: Encodable, Sendable {
+    /// `going` | `maybe` | `declined` | `pending`.
+    public let status: String
+
+    public init(status: String) {
+        self.status = status
+    }
 }

@@ -69,6 +69,44 @@ export function buildSupportTrainAppUrl(supportTrainId: string): string {
   return `pantopus:///support-trains/${encodeURIComponent(supportTrainId)}`;
 }
 
+// ─── Calendarly booking links (mirror buildSupportTrain*) ────
+
+/** Public booking page path: /book/:slug (slug = booking PAGE slug). */
+export function buildBookingPagePath(slug: string): string {
+  return `/book/${encodeURIComponent(slug)}`;
+}
+
+export function buildBookingPageUrl(slug: string): string {
+  return `${APP_WEB_URL}${buildBookingPagePath(slug)}`;
+}
+
+/** Public event path: /book/:slug/:eventTypeSlug. */
+export function buildBookingEventPath(slug: string, eventTypeSlug: string): string {
+  return `/book/${encodeURIComponent(slug)}/${encodeURIComponent(eventTypeSlug)}`;
+}
+
+/** One-off booking link path: /book/o/:token. */
+export function buildOneOffBookingPath(token: string): string {
+  return `/book/o/${encodeURIComponent(token)}`;
+}
+
+/** Invitee manage path: /booking/:token (token = one-time manage token). */
+export function buildBookingManagePath(token: string): string {
+  return `/booking/${encodeURIComponent(token)}`;
+}
+
+export function buildBookingManageUrl(token: string): string {
+  return `${APP_WEB_URL}${buildBookingManagePath(token)}`;
+}
+
+export function buildBookingPageAppUrl(slug: string): string {
+  return `pantopus:///book/${encodeURIComponent(slug)}`;
+}
+
+export function buildBookingManageAppUrl(token: string): string {
+  return `pantopus:///booking/${encodeURIComponent(token)}`;
+}
+
 export function buildListingPath(listingId: string): string {
   return `/listing/${encodeURIComponent(listingId)}`;
 }
