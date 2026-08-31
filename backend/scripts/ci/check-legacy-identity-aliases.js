@@ -82,8 +82,9 @@ const ALLOWLIST_LINE_KEYS = new Set([
   // routes/users.js:serializeCompatibilitySearchUser projects
   // profile.handle into a legacy `username` key for the v1 search response
   // shape. The whole response is a legacy compat surface; retiring it is
-  // a separate audit item.
-  'backend/routes/users.js:298',
+  // a separate audit item. (Line moved 298 → 304 when the persistent-login
+  // requires were added at the top of routes/users.js.)
+  'backend/routes/users.js:304',
 ]);
 
 const ALLOWLIST_LINE_PATTERNS = [
