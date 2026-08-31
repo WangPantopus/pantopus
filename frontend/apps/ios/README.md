@@ -110,6 +110,10 @@ Running the app on a physical device but the backend on your Mac? The simulator'
 1. Set `PANTOPUS_API_BASE_URL` and `PANTOPUS_SOCKET_URL` in `.env` to your Mac's LAN IP, then run `make bootstrap`.
 2. Use [ngrok](https://ngrok.com/) or [Cloudflare Tunnel](https://www.cloudflare.com/products/tunnel/) to expose the backend.
 
+For the full device workflow — code signing, the App IDs automatic signing has
+to create, and why a UI-set Team doesn't survive `make` — see
+[`docs/device-build-runbook.md`](docs/device-build-runbook.md).
+
 ## Release checklist
 
 See `fastlane/Fastfile`. At minimum, before `make beta`:
