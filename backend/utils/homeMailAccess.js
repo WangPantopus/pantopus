@@ -19,10 +19,31 @@ const supabaseAdmin = require('../config/supabaseAdmin');
 const logger = require('./logger');
 
 /**
+ * Occupancy verification states that may read the household's physical mail.
+ *
+ * `is_active` alone is not enough: applyOccupancyTemplate writes
+ * `is_active: true` for `pending_approval` and `pending_postcard` rows, and
+ * POST /api/homes/:id/claim creates one of those for any authenticated caller
+ * on any home id (which POST /api/homes/check-address hands out). Filtering
+ * only on is_active therefore let an unapproved stranger read a household's
+ * scanned envelopes and sender identities the moment they filed a claim —
+ * while the claim route's own contract says "mailbox and private home surfaces
+ * remain locked until verified".
+ *
+ * `provisional_bootstrap` is included deliberately: it is what the person who
+ * created the home is given (routes/home.js), and locking them out of their own
+ * mailbox would break the ordinary path. The excluded states are the ones a
+ * stranger can reach unilaterally — pending_postcard, pending_doc,
+ * pending_approval, unverified — plus any that mean the residency has ended.
+ * Enum values: migration 065.
+ */
+const MAIL_TRUSTED_VERIFICATION_STATUSES = ['verified', 'provisional', 'provisional_bootstrap'];
+
+/**
  * Home ids whose household mail this user may read.
  *
- * Requires an ACTIVE occupancy. Fails closed: on a lookup error the user is
- * scoped to nothing rather than to everything.
+ * Requires an ACTIVE occupancy in a trusted verification state. Fails closed:
+ * on a lookup error the user is scoped to nothing rather than to everything.
  *
  * @param {string} userId
  * @returns {Promise<string[]>}
@@ -34,7 +55,8 @@ async function getAccessibleHomeIds(userId) {
     .from('HomeOccupancy')
     .select('home_id')
     .eq('user_id', userId)
-    .eq('is_active', true);
+    .eq('is_active', true)
+    .in('verification_status', MAIL_TRUSTED_VERIFICATION_STATUSES);
 
   if (error) {
     logger.error('getAccessibleHomeIds: failing closed', { userId, error: error.message });

@@ -58,14 +58,25 @@ async function purgeAddressVerificationEvents(options = {}) {
     return { scanned: ids.length, deleted: 0, retention_days: retentionDays, dry_run: true };
   }
 
-  const { error: delErr } = await supabaseAdmin
-    .from('AddressVerificationEvent')
-    .delete()
-    .in('id', ids);
+  // PostgREST puts `in.(...)` in the query string, so one delete of the whole
+  // 5000-id page builds a ~195KB request URI and is rejected by the API gateway
+  // long before it reaches Postgres — the job would have thrown on every run
+  // against exactly the large table it exists for. Delete in chunks small
+  // enough to stay well inside an 8KB request line.
+  const DELETE_CHUNK = 100;
+  for (let i = 0; i < ids.length; i += DELETE_CHUNK) {
+    const chunk = ids.slice(i, i + DELETE_CHUNK);
+    const { error: delErr } = await supabaseAdmin
+      .from('AddressVerificationEvent')
+      .delete()
+      .in('id', chunk);
 
-  if (delErr) {
-    logger.error('[purgeAddressVerificationEvents] Delete failed', { error: delErr.message });
-    throw delErr;
+    if (delErr) {
+      logger.error('[purgeAddressVerificationEvents] Delete failed', {
+        error: delErr.message, deleted_before_failure: i,
+      });
+      throw delErr;
+    }
   }
 
   logger.info('[purgeAddressVerificationEvents] Completed', {

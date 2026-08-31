@@ -3602,6 +3602,42 @@ router.post('/:id/move-out', verifyToken, async (req, res) => {
       .eq('subject_type', 'user')
       .eq('is_primary_owner', false);
 
+    // LIF-01: clear the legacy owner pointer, exactly as
+    // occupancyAttachService.detach does. checkHomePermission treats
+    // Home.owner_id === userId as ownership, so leaving it set here meant the
+    // app's own Move Out button returned 200 while the departed user kept full
+    // administrative control of the home — including deleting it. detach() is
+    // not the single chokepoint the LIF-01 fix assumed: this route writes
+    // HomeOccupancy directly.
+    const { error: clearOwnerErr } = await supabaseAdmin
+      .from('Home')
+      .update({ owner_id: null, updated_at: now })
+      .eq('id', homeId)
+      .eq('owner_id', userId);
+
+    if (clearOwnerErr) {
+      // Do not report success: the occupancy is inactive but the user would
+      // still hold owner-level access, which is the bug this prevents.
+      logger.error('Failed to clear owner_id on move-out', {
+        error: clearOwnerErr.message, homeId, userId,
+      });
+      return res.status(500).json({ error: 'Failed to process move-out' });
+    }
+
+    // LIF-06: a residency letter asserts to landlords, schools and the DMV that
+    // this person lives here. Moving out must retire the credential — it
+    // otherwise stayed valid until its 90-day expiry for a home the user no
+    // longer occupies.
+    try {
+      const residencyLetterService = require('../services/residencyLetterService');
+      await residencyLetterService.revokeLettersForResidency(homeId, userId, 'residency_move_out');
+    } catch (letterErr) {
+      // Never block the move-out itself on this, but make the gap visible.
+      logger.error('Failed to revoke residency letters on move-out', {
+        homeId, userId, error: letterErr.message,
+      });
+    }
+
     // 4. Check if any active authorities remain
     const { count: authorityCount } = await supabaseAdmin
       .from('HomeOccupancy')

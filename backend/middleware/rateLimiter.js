@@ -128,9 +128,19 @@ const authEndpointLimiter = rateLimit({
  * with curl could run up the bill indefinitely (denial-of-wallet). Mounted
  * after verifyToken so the key is a user id rather than a rotatable IP.
  */
+// CST-01: the meter, not authentication, is the denial-of-wallet control on the
+// billed geocoder — /geo/autocomplete and /geo/resolve carry the signed-out
+// acquisition funnel and cannot require a session.
+//
+// The budget is per hour. A debounced typeahead spends roughly one call per
+// two keystrokes past the 3-character minimum, so entering one address costs
+// ~5-15 calls: a flat 60 locked a signed-in user out after four or five
+// addresses, which the Add Home wizard alone can reach. Signed-in callers are
+// individually accountable and get a realistic budget; anonymous callers share
+// an IP bucket and get a tighter one.
 const geocodeLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  limit: 60,
+  limit: (req) => (req.user?.id ? 300 : 60),
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   keyGenerator: (req) => req.user?.id || req.ip,

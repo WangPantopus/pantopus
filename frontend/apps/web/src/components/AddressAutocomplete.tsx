@@ -210,6 +210,15 @@ export default function AddressAutocomplete({
           setOpen(true);
         }}
         onFocus={() => value.trim().length >= 4 && setOpen(true)}
+        // Options call preventDefault on mousedown, so focus never leaves the
+        // input when one is clicked — a plain blur close is safe here and does
+        // not reintroduce the 120ms race the old timeout was working around.
+        // Without it the popup had no dismissal path at all for a mouse user
+        // and stayed overlaid on the rest of step 1.
+        onBlur={() => {
+          setOpen(false);
+          setActiveIndex(-1);
+        }}
         onKeyDown={handleKeyDown}
         className="w-full px-4 py-2 border border-app-border rounded-lg bg-app-surface text-app-text placeholder:text-app-text-secondary caret-gray-900 [color-scheme:light] focus:outline-none focus:ring-2 focus:ring-primary-500"
         placeholder={placeholder}

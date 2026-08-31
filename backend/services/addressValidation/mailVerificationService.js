@@ -640,14 +640,23 @@ class MailVerificationService {
     // guesses in parallel is strictly worse for an attacker than running them
     // serially — which the lockout already bounds.
     const newAttemptCount = token.attempt_count + 1;
-    const { data: claimed } = await supabaseAdmin
+    const { data: claimed, error: claimErr } = await supabaseAdmin
       .from('AddressVerificationToken')
       .update({ attempt_count: newAttemptCount })
       .eq('id', token.id)
       .eq('attempt_count', token.attempt_count)
       .select('id');
 
-    if (Array.isArray(claimed) && claimed.length === 0) {
+    // Fail closed on both arms. If the increment errored, `claimed` is null and
+    // a `Array.isArray(claimed)` guard alone would fall through to the
+    // comparison — handing out a free, uncounted guess on every DB error and
+    // taking the 900,000-code space back out of the lockout's reach.
+    if (claimErr || !Array.isArray(claimed) || claimed.length === 0) {
+      if (claimErr) {
+        logger.error('MailVerificationService.confirmCode: attempt claim failed', {
+          attemptId, error: claimErr.message,
+        });
+      }
       return {
         verified: false,
         error: 'Another verification attempt is in progress. Please try again.',

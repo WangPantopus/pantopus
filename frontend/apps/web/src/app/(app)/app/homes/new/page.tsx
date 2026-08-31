@@ -480,12 +480,15 @@ export default function NewHomePage() {
           setError('Please fix the highlighted fields.');
           return false;
         case 'MIXED_USE':
-          setValidatedAddressId(null);
-          setFieldErrors({
-            address: 'This building has both homes and businesses, so we need to confirm you live here.',
-          });
-          setError('This address needs an extra verification step.');
-          return false;
+          // Deliberately NOT refused here. The server allows MIXED_USE
+          // (ALLOWED_HOME_VERDICT_STATUSES in routes/home.js) and, when
+          // enforceMixedUseStepUp is on, answers createHome with
+          // ADDRESS_STEP_UP_REQUIRED — which handleCreateHomeError already
+          // routes into MailVerificationFlow below. Blocking it at step 1
+          // made both outcomes unreachable and left every resident of a
+          // flat-over-a-shop with an error naming a step the UI never offered.
+          // The server is the authority on this verdict.
+          break;
         case 'OK':
           break;
         default:

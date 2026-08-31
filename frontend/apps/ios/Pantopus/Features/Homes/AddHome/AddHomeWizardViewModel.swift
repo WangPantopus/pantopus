@@ -814,12 +814,17 @@ final class AddHomeWizardViewModel: WizardModel {
             // and got a generic networking string, with no idea what to change.
             if let addressError = AddressVerificationError.from(error) {
                 addressVerificationError = addressError
-                errorMessage = "\(addressError.message) \(addressError.recoverySuggestion)"
                 if addressError.isFixableInAddressStep {
                     // Send them back to the step that can actually fix it,
                     // rather than stranding them on the final screen.
+                    //
+                    // transition(to:) clears errorMessage on every step change,
+                    // so the message has to be set AFTER the move — setting it
+                    // first sent the user back to the address step with nothing
+                    // on screen, which is the same silent failure this replaces.
                     transition(to: .address)
                 }
+                errorMessage = "\(addressError.message) \(addressError.recoverySuggestion)"
             } else {
                 addressVerificationError = nil
                 errorMessage = (error as? APIError)?.errorDescription

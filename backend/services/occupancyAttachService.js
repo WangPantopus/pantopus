@@ -367,14 +367,29 @@ class OccupancyAttachService {
       return { valid: true };
     }
 
-    const query = supabaseAdmin
+    // `claim_type` is a column on HomeOwnershipClaim (migration 031), not on
+    // AddressClaim (migration 067) — PostgREST rejects the whole request with
+    // 42703, and the error used to be discarded, so a schema fault read as
+    // "this user has no verified claim". Every non-escalated attach on a home
+    // with an address_id therefore failed, including the mail-code path
+    // (mailVerificationService._attachOccupancy always resolves a Home *by*
+    // address_id), so a correct postcard code could never produce an occupancy.
+    const { data: claims, error: claimErr } = await supabaseAdmin
       .from('AddressClaim')
-      .select('id, claim_status, verification_method, claim_type')
+      .select('id, claim_status, verification_method')
       .eq('user_id', userId)
       .eq('address_id', addressId)
       .eq('claim_status', 'verified');
 
-    const { data: claims } = await query;
+    if (claimErr) {
+      // A lookup failure is not evidence of anything. Fail closed, but say so,
+      // instead of reporting it as a missing claim and sending the user off to
+      // redo verification they have already completed.
+      logger.error('OccupancyAttachService._validateClaim: claim lookup failed', {
+        userId, addressId, error: claimErr.message,
+      });
+      return { valid: false, error: 'Could not verify your address claim. Please try again.' };
+    }
 
     if (!claims || claims.length === 0) {
       return { valid: false, error: 'No verified address claim found. Complete address verification first.' };

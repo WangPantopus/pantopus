@@ -111,13 +111,23 @@ describe('CRIT-03 — household mail access has exactly one definition', () => {
     expect(offenders).toEqual([]);
   });
 
-  test('the shared helper requires an active occupancy', () => {
+  test('the shared helper requires an active, trusted occupancy', () => {
     const src = fs.readFileSync(
       path.join(__dirname, '../../utils/homeMailAccess.js'), 'utf8',
     );
     expect(src).toContain("eq('is_active', true)");
+    expect(src).toContain("in('verification_status'");
     // and must not re-admit the legacy owner_id leg
     expect(src).not.toContain("eq('owner_id'");
+  });
+
+  test('the per-item gate on mailbox.js uses the shared helper', () => {
+    // The list path was consolidated but canAccessMail kept its own query,
+    // which matched any HomeOccupancy row for the home — no is_active filter
+    // and no verification_status filter — on eight per-item routes.
+    const src = fs.readFileSync(path.join(routesDir, 'mailbox.js'), 'utf8');
+    const gate = src.slice(src.indexOf('const canAccessMail'));
+    expect(gate.slice(0, 600)).toContain('getAccessibleHomeIds');
   });
 });
 
@@ -126,16 +136,55 @@ describe('CRIT-03 — the shared helper fails closed', () => {
 
   test('returns nothing for a user with only an inactive occupancy', async () => {
     seedTable('HomeOccupancy', [{
-      id: 'occ-x', home_id: 'home-9', user_id: 'moved-out', is_active: false,
+      id: 'occ-x',
+      home_id: 'home-9',
+      user_id: 'moved-out',
+      is_active: false,
+      verification_status: 'moved_out',
     }]);
     await expect(getAccessibleHomeIds('moved-out')).resolves.toEqual([]);
   });
 
-  test('returns the home for an active occupant', async () => {
+  test('returns the home for an active, verified occupant', async () => {
     seedTable('HomeOccupancy', [{
-      id: 'occ-y', home_id: 'home-9', user_id: 'resident', is_active: true,
+      id: 'occ-y',
+      home_id: 'home-9',
+      user_id: 'resident',
+      is_active: true,
+      verification_status: 'verified',
     }]);
     await expect(getAccessibleHomeIds('resident')).resolves.toEqual(['home-9']);
+  });
+
+  test('returns the home for the creator, whose status is provisional_bootstrap', async () => {
+    seedTable('HomeOccupancy', [{
+      id: 'occ-z',
+      home_id: 'home-9',
+      user_id: 'creator',
+      is_active: true,
+      verification_status: 'provisional_bootstrap',
+    }]);
+    await expect(getAccessibleHomeIds('creator')).resolves.toEqual(['home-9']);
+  });
+
+  // applyOccupancyTemplate writes is_active: true for pending rows, and
+  // POST /api/homes/:id/claim creates one for any authenticated caller on any
+  // home id. Filtering on is_active alone therefore handed an unapproved
+  // stranger the household's scanned envelopes and sender identities.
+  test.each([
+    ['pending_approval'],
+    ['pending_postcard'],
+    ['pending_doc'],
+    ['unverified'],
+  ])('returns nothing for an active but %s occupancy', async (status) => {
+    seedTable('HomeOccupancy', [{
+      id: `occ-${status}`,
+      home_id: 'home-9',
+      user_id: 'claimant',
+      is_active: true,
+      verification_status: status,
+    }]);
+    await expect(getAccessibleHomeIds('claimant')).resolves.toEqual([]);
   });
 
   test('returns nothing for a missing user id', async () => {
