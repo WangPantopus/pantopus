@@ -70,6 +70,45 @@ export const fetchPublicSupportTrain = cache(async (id: string): Promise<PublicF
   return { data: result.data ?? null, status: result.status };
 });
 
+// ── Calendarly public booking reads (mirror fetchPublicSupportTrain) ──
+// The page/manage/poll SHELL is fetched server-side here (cache() +
+// revalidate:60 via fetchPublicJson) for SEO + generateMetadata. Slots are
+// fetched CLIENT-SIDE with no-store (see SlotPicker) so availability is fresh.
+
+export const fetchPublicBooking = cache(
+  async (slug: string, tz?: string): Promise<PublicFetchResult<any>> => {
+    const qs = tz ? `?tz=${encodeURIComponent(tz)}` : '';
+    const result = await fetchPublicJson<any>(
+      `/api/public/book/${encodeURIComponent(slug)}${qs}`
+    );
+    return { data: result.data ?? null, status: result.status };
+  }
+);
+
+export const fetchPublicOneOff = cache(
+  async (token: string, tz?: string): Promise<PublicFetchResult<any>> => {
+    const qs = tz ? `?tz=${encodeURIComponent(tz)}` : '';
+    const result = await fetchPublicJson<any>(
+      `/api/public/book/o/${encodeURIComponent(token)}${qs}`
+    );
+    return { data: result.data ?? null, status: result.status };
+  }
+);
+
+export const fetchPublicBookingByToken = cache(
+  async (token: string): Promise<PublicFetchResult<any>> => {
+    const result = await fetchPublicJson<any>(
+      `/api/public/booking/${encodeURIComponent(token)}`
+    );
+    return { data: result.data ?? null, status: result.status };
+  }
+);
+
+export const fetchPublicPoll = cache(async (id: string): Promise<PublicFetchResult<any>> => {
+  const result = await fetchPublicJson<any>(`/api/public/poll/${encodeURIComponent(id)}`);
+  return { data: result.data ?? null, status: result.status };
+});
+
 export const fetchPublicUser = cache(async (username: string): Promise<PublicFetchResult<any>> => {
   const identifier = normalizePublicProfileIdentifier(username);
   if (!identifier) return { data: null, status: 404 };

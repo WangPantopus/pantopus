@@ -60,7 +60,10 @@ const homeCreationLimiter = rateLimit({
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   keyGenerator: (req) => req.user?.id || req.ip,
-  skip: (req) => req.method !== 'POST' || req.path === '/check-address',
+  // The '/:homeId/scheduling/**' skip matters: this limiter is mounted on ALL of /api/homes,
+  // so without it every home-scoped Calendarly POST (create event type, block, workflow…)
+  // burned the 5-per-hour home-CREATION budget and 429'd ordinary scheduling setup.
+  skip: (req) => req.method !== 'POST' || req.path === '/check-address' || /^\/[^/]+\/scheduling(\/|$)/.test(req.path),
   message: { error: 'Too many home creation requests. Please try again later.' },
 });
 
@@ -264,9 +267,25 @@ const residencyLetterIssueLimiter = rateLimit({
   message: { error: 'Too many letters issued today. Please try again tomorrow.' },
 });
 
+/**
+ * Limiter for public (unauthenticated) Calendarly booking writes — create / reschedule / cancel
+ * via /api/public/book and /api/public/booking. Tighter than the read previewLimiter and keyed
+ * per-user-or-IP, since these create rows, fire payment intents, and send email. Skips reads.
+ */
+const bookingWriteLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  skip: (req) => req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS',
+  message: { error: 'Too many booking requests. Please try again shortly.' },
+});
+
 module.exports = {
   globalWriteLimiter,
   financialWriteLimiter,
+  bookingWriteLimiter,
   contentCreationLimiter,
   homeCreationLimiter,
   ownershipClaimLimiter,

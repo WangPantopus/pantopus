@@ -62,12 +62,15 @@ final class AddEventFormViewModelTests: XCTestCase {
         XCTAssertFalse(vm.isValid)
         XCTAssertEqual(vm.category, .generic)
         XCTAssertFalse(vm.allDay)
-        XCTAssertNil(vm.endDate)
+        // Design FrameCreate prefills "Ends" at start + 1h (matches Android).
+        XCTAssertEqual(vm.endDate, Self.fixedStart.addingTimeInterval(3600))
         XCTAssertEqual(vm.recurrence, .none)
-        XCTAssertEqual(vm.reminder, .none)
+        // Stream I10: a fresh event preselects the 10-minute reminder.
+        XCTAssertEqual(vm.reminderOffsets, [.tenMin])
+        XCTAssertFalse(vm.requestRsvp)
         XCTAssertTrue(vm.selectedAttendeeIds.isEmpty)
-        XCTAssertEqual(vm.screenTitle, "Add event")
-        XCTAssertEqual(vm.commitLabel, "Add")
+        XCTAssertEqual(vm.screenTitle, "New event")
+        XCTAssertEqual(vm.commitLabel, "Save")
     }
 
     // MARK: - Validation
@@ -164,7 +167,7 @@ final class AddEventFormViewModelTests: XCTestCase {
         vm.updateField(.title, to: "Soccer game · Ava")
         vm.category = .social
         vm.recurrence = .weekly
-        vm.reminder = .oneHour
+        vm.reminderOffsets = [.oneHour]
         let ok = await vm.submit()
         XCTAssertTrue(ok)
         guard case let .created(id) = vm.pendingEvent else {
@@ -227,7 +230,8 @@ final class AddEventFormViewModelTests: XCTestCase {
         XCTAssertEqual(vm.fields[.notes]?.value, "Bring water")
         XCTAssertEqual(vm.category, .social)
         XCTAssertEqual(vm.recurrence, .weekly)
-        XCTAssertEqual(vm.reminder, .fifteenMin)
+        // alerts_enabled with no reminders array hydrates to a single 10-min.
+        XCTAssertEqual(vm.reminderOffsets, [.tenMin])
         XCTAssertEqual(vm.selectedAttendeeIds, ["u1", "u3"])
         XCTAssertFalse(vm.allDay)
         XCTAssertNotNil(vm.endDate)
@@ -252,7 +256,7 @@ final class AddEventFormViewModelTests: XCTestCase {
         XCTAssertTrue(vm.allDay)
         XCTAssertNil(vm.endDate)
         XCTAssertEqual(vm.recurrence, .yearly)
-        XCTAssertEqual(vm.reminder, .none)
+        XCTAssertTrue(vm.reminderOffsets.isEmpty)
     }
 
     func testEditingDirtyTracksMutations() {

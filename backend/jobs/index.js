@@ -83,6 +83,7 @@ const expirePendingPaymentBids = require('./expirePendingPaymentBids');
 const authRegistryPrune = require('./authRegistryPrune');
 // Support Train reminders
 const { runSupportTrainReminders } = require('./supportTrainReminders');
+const { runBookingReminders } = require('./bookingReminders');
 // Payment health alerting
 const { checkAndAlertStuckPayments } = require('../routes/paymentOps');
 
@@ -480,6 +481,12 @@ function startJobs() {
     timezone: 'UTC',
   });
 
+  // Calendarly booking reminders — every 15 minutes at :03/:18/:33/:48 (T-24h + T-1h).
+  cron.schedule('3,18,33,48 * * * *', wrapJob('bookingReminders', runBookingReminders), {
+    scheduled: true,
+    timezone: 'UTC',
+  });
+
   logger.info('[CRON] Background jobs initialized', {
     jobs: [
       { name: 'authorizeUpcomingGigs', schedule: 'hourly at :05' },
@@ -522,6 +529,7 @@ function startJobs() {
       { name: 'autoRemindWorker', schedule: 'every 5 minutes at :02/:07/:12/...' },
       { name: 'expirePendingPaymentBids', schedule: 'every 2 minutes' },
       { name: 'supportTrainReminders', schedule: 'every 30 minutes at :09/:39' },
+      { name: 'bookingReminders', schedule: 'every 15 minutes at :03/:18/:33/:48' },
     ],
   });
 }

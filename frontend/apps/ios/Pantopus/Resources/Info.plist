@@ -56,6 +56,8 @@
 	<string>Pantopus uses your location to show gigs and neighbors near you.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Pantopus uses the microphone for voice messages in chat.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Pantopus saves images you export, like your booking QR code, to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Pantopus uses your photo library to upload profile photos, listing images, and mail.</string>
 	<key>NSSupportsLiveActivities</key>

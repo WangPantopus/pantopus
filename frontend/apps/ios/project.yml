@@ -126,6 +126,7 @@ targets:
         NSLocationAlwaysAndWhenInUseUsageDescription: "Pantopus uses your location to show gigs and neighbors near you, and for location-based notifications."
         NSCameraUsageDescription: "Pantopus uses the camera for profile photos, listing images, mail capture, and taking photos to send in chat."
         NSPhotoLibraryUsageDescription: "Pantopus uses your photo library to upload profile photos, listing images, and mail."
+        NSPhotoLibraryAddUsageDescription: "Pantopus saves images you export, like your booking QR code, to your photo library."
         NSMicrophoneUsageDescription: "Pantopus uses the microphone for voice messages in chat."
         NSFaceIDUsageDescription: "Pantopus uses Face ID to continue signed in after a reinstall, to unlock the app, and to confirm sensitive actions like payments and removing devices."
         UIBackgroundModes:
@@ -145,16 +146,20 @@ targets:
         # production APNs environment). Xcode substitutes the build setting
         # into the entitlements plist at sign time.
         aps-environment: $(APS_ENVIRONMENT)
-        # pantopus.com is the product domain (share / invite links, AASA);
-        # the .app entries are kept so links already in circulation still
-        # resolve. This list is the regen source of truth for
-        # Pantopus/Resources/Pantopus.entitlements — keep both in sync.
+        # pantopus.com is the product domain: it is what the backend and both
+        # clients put in share and invite links, and it is where the web app
+        # serves .well-known/apple-app-site-association. The .app entries are
+        # kept so any link already in circulation still resolves; iOS verifies
+        # each domain independently, so an unserved one costs nothing.
         #
         # `webcredentials:` (persistent login, design §8 / §11): associates
         # the app with the web origins for Password AutoFill + passkeys, so
         # the `.username` login field offers the credential saved for
         # pantopus.com. Served from each host's
         # `.well-known/apple-app-site-association` (`webcredentials` key).
+        #
+        # This list is the regen source of truth for
+        # Pantopus/Resources/Pantopus.entitlements — keep both in sync.
         com.apple.developer.associated-domains:
           - applinks:pantopus.com
           - applinks:www.pantopus.com

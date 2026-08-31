@@ -2,10 +2,14 @@
 //  AddEventFormView.swift
 //  Pantopus
 //
-//  P2.7 — Add / edit event form. Renders inside the shared `FormShell`
-//  with one field group per design section. Reuses
-//  `CalendarEventCategory` for the chip strip + attendee picker
-//  vocabulary.
+//  F3 — Home Add / Edit Event sheet. Renders the bespoke sections from
+//  `add-event-frames.jsx`: a green-overline `EventSection` per group, a
+//  wrapping `CatPick` category pill row, sunken date value pills, a
+//  segmented Repeats control, an "Assign to" list with a green
+//  selected-count + round green `Check`, gradient member avatars, the
+//  amber offline banner, and the dimmed "Saving event" overlay. Identity
+//  chrome uses the Home pillar accent (green); functional controls stay
+//  product sky only where the design draws them so.
 //
 
 // swiftlint:disable file_length
@@ -48,25 +52,35 @@ struct AddEventFormView: View {
             onClose: onClose,
             onCommit: { Task { await viewModel.submit() } },
             content: {
+                if !NetworkMonitor.shared.isOnline {
+                    AddEventOfflineBanner()
+                }
                 TitleGroup(viewModel: viewModel)
                 CategoryGroup(viewModel: viewModel)
                 ScheduleGroup(viewModel: viewModel)
-                LocationGroup(viewModel: viewModel)
                 RecurrenceGroup(viewModel: viewModel)
                 AttendeesGroup(viewModel: viewModel)
                 ReminderGroup(viewModel: viewModel)
+                RequestRsvpGroup(viewModel: viewModel)
                 NotesGroup(viewModel: viewModel)
                 Color.clear.frame(height: Spacing.s5)
             }
         )
         .formShakeOnChange(of: viewModel.shakeTrigger)
         .accessibilityIdentifier("addEventForm")
+        .overlay { savingOverlay }
         .overlay(alignment: .bottom) { toastOverlay }
         .task { await viewModel.load() }
         .onChange(of: viewModel.pendingEvent) { _, pending in
             guard let pending else { return }
             viewModel.acknowledgePendingEvent()
             onCommitted(pending)
+        }
+    }
+
+    @ViewBuilder private var savingOverlay: some View {
+        if viewModel.isSaving {
+            SavingOverlay()
         }
     }
 
@@ -83,20 +97,123 @@ struct AddEventFormView: View {
     }
 }
 
+// MARK: - Section (green-overline card)
+
+/// Bespoke section card matching the design's `Section` — a white card with
+/// a Home-green (`H.accent700`) uppercase overline. The shared
+/// `FormFieldGroup` hardcodes a neutral overline, so the F3 sheet renders its
+/// own to carry the Home pillar accent on the section labels.
+private struct EventSection<Content: View>: View {
+    private let overline: String?
+    private let content: Content
+
+    init(_ overline: String? = nil, @ViewBuilder content: () -> Content) {
+        self.overline = overline
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            if let overline {
+                Text(overline)
+                    .pantopusTextStyle(.overline)
+                    .foregroundStyle(Theme.Color.homeDark)
+                    .accessibilityAddTraits(.isHeader)
+            }
+            VStack(alignment: .leading, spacing: Spacing.s3) {
+                content
+            }
+        }
+        .padding(Spacing.s4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .padding(.horizontal, Spacing.s4)
+    }
+}
+
+// MARK: - Offline banner
+
+/// Amber `wifi-off` banner the design pins to the top of the offline sheet
+/// ("This event saves when you reconnect."). Named distinctly from the shared
+/// `Core/Design/Components/OfflineBanner` strip — this is the in-sheet inline
+/// `Banner` the F3 design draws, not the screen-level offline strip.
+private struct AddEventOfflineBanner: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: Spacing.s2) {
+            Icon(.wifiOff, size: 15, strokeWidth: 2.2, color: Theme.Color.warning)
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                Text("You're offline")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.warning)
+                Text("This event saves when you reconnect.")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextStrong)
+            }
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.warningBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.warningLight, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .padding(.horizontal, Spacing.s4)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("addEvent_offlineBanner")
+    }
+}
+
+// MARK: - Saving overlay
+
+/// Dims the sheet behind a centered "Saving event" spinner card, matching the
+/// design's `FrameSaving` overlay.
+private struct SavingOverlay: View {
+    var body: some View {
+        ZStack {
+            Theme.Color.appText.opacity(0.18).ignoresSafeArea()
+            VStack(spacing: Spacing.s3) {
+                ProgressView()
+                    .controlSize(.large)
+                    .tint(Theme.Color.home)
+                Text("Saving event")
+                    .pantopusTextStyle(.small)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.appTextStrong)
+            }
+            .padding(.horizontal, Spacing.s6)
+            .padding(.vertical, Spacing.s5)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+            .shadow(color: .black.opacity(0.10), radius: 12, x: 0, y: 8)
+        }
+        .allowsHitTesting(true)
+        .accessibilityIdentifier("addEvent_savingOverlay")
+        .accessibilityLabel("Saving event")
+    }
+}
+
 // MARK: - Title
 
 private struct TitleGroup: View {
     @Bindable var viewModel: AddEventFormViewModel
 
     var body: some View {
-        FormFieldGroup("Title") {
+        EventSection {
             PantopusTextField(
                 "Title",
                 text: Binding(
                     get: { viewModel.fields[.title]?.value ?? "" },
                     set: { viewModel.updateField(.title, to: $0) }
                 ),
-                placeholder: "What's the event?",
+                placeholder: "Add a title",
                 state: state(for: .title),
                 identifier: "addEvent_titleField"
             )
@@ -115,19 +232,17 @@ private struct TitleGroup: View {
 private struct CategoryGroup: View {
     @Bindable var viewModel: AddEventFormViewModel
 
+    /// The design's five-category vocabulary (`CATS` in
+    /// `add-event-frames.jsx:8`): health · chore · meal · family · school.
     private static let categories: [CalendarEventCategory] = [
-        .chore, .birthday, .maintenance, .school, .medical, .social, .family, .pet,
-        .delivery, .trash, .bill, .generic
+        .medical, .chore, .meal, .family, .school
     ]
 
     var body: some View {
-        FormFieldGroup("Category") {
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 110), spacing: Spacing.s2)],
-                spacing: Spacing.s2
-            ) {
+        EventSection("Category") {
+            ChipFlow(spacing: Spacing.s2) {
                 ForEach(Self.categories, id: \.self) { category in
-                    CategoryChip(
+                    CategoryPill(
                         category: category,
                         isSelected: viewModel.category == category
                     ) {
@@ -139,47 +254,36 @@ private struct CategoryGroup: View {
     }
 }
 
-private struct CategoryChip: View {
+/// Rounded-pill category chip: colour dot + label. Selected = Home-green
+/// background (`H.bg100`/homeBg) + Home-dark-green text, matching `CatPick`.
+private struct CategoryPill: View {
     let category: CalendarEventCategory
     let isSelected: Bool
     let onTap: @MainActor () -> Void
 
     var body: some View {
-        Button {
-            onTap()
-        } label: {
+        Button(action: onTap) {
             HStack(spacing: Spacing.s2) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: Radii.sm)
-                        .fill(category.background)
-                        .frame(width: 28, height: 28)
-                    Icon(category.icon, size: 16, color: category.foreground)
-                }
-                Text(category.label)
-                    .pantopusTextStyle(.small)
-                    .foregroundStyle(Theme.Color.appText)
+                Circle()
+                    .fill(category.dotColor)
+                    .frame(width: 8, height: 8)
+                Text(category.pickerLabel)
+                    .font(.system(size: 12, weight: isSelected ? .bold : .semibold))
+                    .foregroundStyle(isSelected ? Theme.Color.homeDark : Theme.Color.appTextStrong)
                     .lineLimit(1)
-                Spacer(minLength: Spacing.s0)
-                if isSelected {
-                    Icon(.check, size: 14, color: Theme.Color.primary600)
-                }
             }
             .padding(.horizontal, Spacing.s3)
-            .padding(.vertical, Spacing.s2)
-            .frame(minHeight: 44)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: Radii.md)
-                    .stroke(
-                        isSelected ? Theme.Color.primary600 : Theme.Color.appBorder,
-                        lineWidth: isSelected ? 2 : 1
-                    )
+            .padding(.vertical, 7)
+            .background(isSelected ? Theme.Color.homeBg : Theme.Color.appSurface)
+            .overlay(
+                Capsule().stroke(isSelected ? Color.clear : Theme.Color.appBorder, lineWidth: 1)
             )
-            .contentShape(Rectangle())
+            .clipShape(Capsule())
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("addEvent_category_\(category.rawValue)")
-        .accessibilityLabel(category.label)
+        .accessibilityLabel(category.pickerLabel)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
@@ -190,159 +294,179 @@ private struct ScheduleGroup: View {
     @Bindable var viewModel: AddEventFormViewModel
 
     var body: some View {
-        FormFieldGroup("Schedule") {
-            Toggle(isOn: $viewModel.allDay) {
-                Text("All day")
-                    .pantopusTextStyle(.body)
-                    .foregroundStyle(Theme.Color.appText)
-            }
-            .toggleStyle(SwitchToggleStyle(tint: Theme.Color.primary600))
-            .frame(minHeight: 44)
-            .accessibilityIdentifier("addEvent_allDayToggle")
+        EventSection("When") {
+            VStack(spacing: Spacing.s0) {
+                // All-day
+                ValueRow(label: "All-day") {
+                    Toggle("", isOn: $viewModel.allDay)
+                        .labelsHidden()
+                        .toggleStyle(SwitchToggleStyle(tint: Theme.Color.home))
+                        .accessibilityIdentifier("addEvent_allDayToggle")
+                }
+                Divider().overlay(Theme.Color.appBorder)
 
-            // Start
-            VStack(alignment: .leading, spacing: Spacing.s1) {
-                Text("Starts")
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                DatePicker(
-                    "Starts",
-                    selection: $viewModel.startDate,
-                    displayedComponents: viewModel.allDay ? [.date] : [.date, .hourAndMinute]
-                )
-                .labelsHidden()
-                .frame(minHeight: 44)
-                .accessibilityIdentifier("addEvent_startDate")
-            }
+                // Starts
+                ValueRow(label: "Starts") {
+                    DateValuePill(
+                        date: $viewModel.startDate,
+                        showsTime: !viewModel.allDay,
+                        isError: false,
+                        identifier: "addEvent_startDate"
+                    )
+                }
 
-            // End
-            if !viewModel.allDay {
-                EndDateRow(viewModel: viewModel)
+                // Ends
+                if !viewModel.allDay {
+                    Divider().overlay(Theme.Color.appBorder)
+                    ValueRow(label: "Ends", isError: viewModel.endError != nil) {
+                        DateValuePill(
+                            date: Binding(
+                                get: { viewModel.endDate ?? viewModel.startDate.addingTimeInterval(60 * 60) },
+                                set: { viewModel.endDate = $0 }
+                            ),
+                            showsTime: true,
+                            isError: viewModel.endError != nil,
+                            identifier: "addEvent_endDate"
+                        )
+                    }
+                    if let error = viewModel.endError {
+                        HStack(spacing: Spacing.s1) {
+                            Icon(.circleAlert, size: 11, color: Theme.Color.error)
+                            Text(error)
+                                .pantopusTextStyle(.caption)
+                                .foregroundStyle(Theme.Color.error)
+                            Spacer(minLength: Spacing.s0)
+                        }
+                        .padding(.top, Spacing.s1)
+                        .accessibilityIdentifier("addEvent_endError")
+                    }
+                }
             }
         }
     }
 }
 
-private struct EndDateRow: View {
-    @Bindable var viewModel: AddEventFormViewModel
+/// Inline "label left · control right" row matching the design's `ValueRow`.
+private struct ValueRow<Trailing: View>: View {
+    let label: String
+    var isError: Bool = false
+    @ViewBuilder let trailing: Trailing
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s1) {
-            HStack(spacing: Spacing.s2) {
-                Text("Ends")
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                Spacer()
-                Toggle(isOn: hasEndBinding) {
-                    Text("Has end")
-                        .pantopusTextStyle(.caption)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-                .toggleStyle(SwitchToggleStyle(tint: Theme.Color.primary600))
-                .labelsHidden()
-                .accessibilityIdentifier("addEvent_hasEndToggle")
-            }
-            if viewModel.endDate != nil {
-                DatePicker(
-                    "Ends",
-                    selection: Binding(
-                        get: { viewModel.endDate ?? viewModel.startDate.addingTimeInterval(60 * 60) },
-                        set: { viewModel.endDate = $0 }
-                    ),
-                    in: viewModel.startDate...,
-                    displayedComponents: [.date, .hourAndMinute]
-                )
-                .labelsHidden()
-                .frame(minHeight: 44)
-                .accessibilityIdentifier("addEvent_endDate")
-            }
-            if let error = viewModel.endError {
-                Text(error)
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.error)
-            }
+        HStack(spacing: Spacing.s3) {
+            Text(label)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(isError ? Theme.Color.error : Theme.Color.appTextStrong)
+            Spacer(minLength: Spacing.s2)
+            trailing
         }
+        .frame(minHeight: 44)
     }
+}
 
-    private var hasEndBinding: Binding<Bool> {
-        Binding(
-            get: { viewModel.endDate != nil },
-            set: { newValue in
-                if newValue, viewModel.endDate == nil {
-                    viewModel.endDate = viewModel.startDate.addingTimeInterval(60 * 60)
-                } else if !newValue {
-                    viewModel.endDate = nil
-                }
-            }
+/// Compact sunken date pill — looks like the design's value pill but stays a
+/// real picker so the date is editable.
+private struct DateValuePill: View {
+    @Binding var date: Date
+    let showsTime: Bool
+    let isError: Bool
+    let identifier: String
+
+    var body: some View {
+        DatePicker(
+            "",
+            selection: $date,
+            displayedComponents: showsTime ? [.date, .hourAndMinute] : [.date]
         )
+        .labelsHidden()
+        .datePickerStyle(.compact)
+        .font(.system(size: 12, weight: .semibold))
+        .tint(isError ? Theme.Color.error : Theme.Color.home)
+        .accessibilityIdentifier(identifier)
     }
 }
 
-// MARK: - Location
-
-private struct LocationGroup: View {
-    @Bindable var viewModel: AddEventFormViewModel
-
-    var body: some View {
-        FormFieldGroup("Location") {
-            PantopusTextField(
-                "Where",
-                text: Binding(
-                    get: { viewModel.fields[.location]?.value ?? "" },
-                    set: { viewModel.updateField(.location, to: $0) }
-                ),
-                placeholder: "Optional · address, room, link",
-                identifier: "addEvent_locationField"
-            )
-        }
-    }
-}
-
-// MARK: - Recurrence
+// MARK: - Recurrence (segmented)
 
 private struct RecurrenceGroup: View {
     @Bindable var viewModel: AddEventFormViewModel
 
     var body: some View {
-        FormFieldGroup("Repeat") {
-            VStack(spacing: Spacing.s0) {
-                ForEach(AddEventRecurrence.allCases, id: \.self) { option in
-                    PickerRow(
-                        label: option.label,
-                        isSelected: viewModel.recurrence == option,
-                        identifier: "addEvent_recurrence_\(option.rawValue)"
+        EventSection("Repeats") {
+            HStack(spacing: Spacing.s1) {
+                ForEach(AddEventRecurrence.pickerOptions, id: \.self) { option in
+                    SegmentButton(
+                        label: option.segmentedLabel,
+                        isSelected: viewModel.recurrence == option
                     ) {
                         viewModel.recurrence = option
                     }
-                    if option != AddEventRecurrence.allCases.last {
-                        Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
-                    }
+                    .accessibilityIdentifier("addEvent_recurrence_\(option.rawValue)")
                 }
             }
+            .padding(Spacing.s1)
+            .background(Theme.Color.appSurfaceSunken)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
         }
     }
 }
 
-// MARK: - Attendees
+/// One segment of the design's `Segmented` control — Home-green fill + white
+/// label when selected.
+private struct SegmentButton: View {
+    let label: String
+    let isSelected: Bool
+    let onTap: @MainActor () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            Text(label)
+                .font(.system(size: 12, weight: isSelected ? .bold : .semibold))
+                .foregroundStyle(isSelected ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 30)
+                .background(isSelected ? Theme.Color.home : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+// MARK: - Attendees ("Assign to")
 
 private struct AttendeesGroup: View {
     @Bindable var viewModel: AddEventFormViewModel
 
     var body: some View {
-        FormFieldGroup("Attendees") {
-            if viewModel.attendees.isEmpty {
-                EmptyAttendeesRow()
-            } else {
-                VStack(spacing: Spacing.s0) {
-                    ForEach(viewModel.attendees) { attendee in
-                        AttendeeRow(
-                            attendee: attendee,
-                            isSelected: viewModel.selectedAttendeeIds.contains(attendee.id)
-                        ) {
-                            viewModel.toggleAttendee(attendee.id)
-                        }
-                        if attendee.id != viewModel.attendees.last?.id {
-                            Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+        EventSection("Assign to") {
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                HStack {
+                    Text("Assign to")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                    Spacer()
+                    Text("\(viewModel.selectedAttendeeIds.count) selected")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Theme.Color.homeDark)
+                        .accessibilityIdentifier("addEvent_assignedCount")
+                }
+
+                if viewModel.attendees.isEmpty {
+                    EmptyAttendeesRow()
+                } else {
+                    VStack(spacing: Spacing.s0) {
+                        ForEach(viewModel.attendees) { attendee in
+                            AttendeeRow(
+                                attendee: attendee,
+                                isSelected: viewModel.selectedAttendeeIds.contains(attendee.id)
+                            ) {
+                                viewModel.toggleAttendee(attendee.id)
+                            }
+                            if attendee.id != viewModel.attendees.last?.id {
+                                Divider().overlay(Theme.Color.appBorder)
+                            }
                         }
                     }
                 }
@@ -357,18 +481,15 @@ private struct AttendeeRow: View {
     let onTap: @MainActor () -> Void
 
     var body: some View {
-        Button {
-            onTap()
-        } label: {
+        Button(action: onTap) {
             HStack(spacing: Spacing.s3) {
-                AttendeeInitial(initials: attendee.initials)
+                MemberGradientAvatar(seed: attendee.id, initials: attendee.initials)
                 Text(attendee.displayName)
-                    .pantopusTextStyle(.body)
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.Color.appText)
                 Spacer()
-                CheckMark(isSelected: isSelected)
+                RoundCheck(isSelected: isSelected)
             }
-            .padding(.vertical, Spacing.s2)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
@@ -394,39 +515,50 @@ private struct EmptyAttendeesRow: View {
     }
 }
 
-private struct AttendeeInitial: View {
+/// 32pt circular gradient avatar with a 2pt white ring, matching the design's
+/// `Avatar` primitive. Keyed on the member id via the shared
+/// `HomeMemberPalette` so a member reads the same colour across screens.
+private struct MemberGradientAvatar: View {
+    let seed: String
     let initials: String
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(Theme.Color.homeBg)
-            Text(initials.isEmpty ? "·" : initials)
-                .pantopusTextStyle(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(Theme.Color.home)
-        }
-        .frame(width: 32, height: 32)
+        let pair = HomeMemberPalette.gradient(for: seed)
+        Text(initials.isEmpty ? "·" : initials)
+            .font(.system(size: 32 * 0.38, weight: .bold))
+            .foregroundStyle(Theme.Color.appTextInverse)
+            .frame(width: 32, height: 32)
+            .background(
+                LinearGradient(
+                    colors: [pair.start, pair.end],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .clipShape(Circle())
+            .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
+            .accessibilityHidden(true)
     }
 }
 
-private struct CheckMark: View {
+/// Round Home-green check matching the design's `Check` (round, green fill +
+/// white tick when on; grey ring when off).
+private struct RoundCheck: View {
     let isSelected: Bool
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: Radii.xs)
-                .stroke(
-                    isSelected ? Theme.Color.primary600 : Theme.Color.appBorderStrong,
-                    lineWidth: isSelected ? 0 : 1.5
+            Circle()
+                .fill(isSelected ? Theme.Color.home : Color.clear)
+                .overlay(
+                    Circle().stroke(
+                        isSelected ? Theme.Color.home : Theme.Color.appBorderStrong,
+                        lineWidth: 1.5
+                    )
                 )
-                .background(
-                    RoundedRectangle(cornerRadius: Radii.xs)
-                        .fill(isSelected ? Theme.Color.primary600 : Color.clear)
-                )
-                .frame(width: 22, height: 22)
+                .frame(width: 20, height: 20)
             if isSelected {
-                Icon(.check, size: 14, color: Theme.Color.appTextInverse)
+                Icon(.check, size: 12, strokeWidth: 3, color: Theme.Color.appTextInverse)
             }
         }
     }
@@ -438,20 +570,70 @@ private struct ReminderGroup: View {
     @Bindable var viewModel: AddEventFormViewModel
 
     var body: some View {
-        FormFieldGroup("Reminder") {
-            VStack(spacing: Spacing.s0) {
-                ForEach(AddEventReminder.allCases, id: \.self) { option in
-                    PickerRow(
-                        label: option.label,
-                        isSelected: viewModel.reminder == option,
-                        identifier: "addEvent_reminder_\(option.rawValue)"
+        EventSection("Reminder") {
+            ChipFlow(spacing: Spacing.s2) {
+                ForEach(AddEventReminderOffset.allCases, id: \.self) { offset in
+                    ReminderChip(
+                        label: offset.label,
+                        isOn: viewModel.reminderOffsets.contains(offset)
                     ) {
-                        viewModel.reminder = option
-                    }
-                    if option != AddEventReminder.allCases.last {
-                        Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+                        viewModel.toggleReminder(offset)
                     }
                 }
+            }
+        }
+    }
+}
+
+private struct ReminderChip: View {
+    let label: String
+    let isOn: Bool
+    let onTap: @MainActor () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: Spacing.s1) {
+                if isOn {
+                    Icon(.check, size: 12, strokeWidth: 3, color: Theme.Color.homeDark)
+                }
+                Text(label)
+                    .font(.system(size: 12, weight: isOn ? .bold : .semibold))
+                    .foregroundStyle(isOn ? Theme.Color.homeDark : Theme.Color.appTextStrong)
+            }
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, 7)
+            .background(isOn ? Theme.Color.homeBg : Theme.Color.appSurface)
+            .overlay(
+                Capsule().stroke(isOn ? Color.clear : Theme.Color.appBorder, lineWidth: 1)
+            )
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("addEvent_reminder_\(label)")
+        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+// MARK: - Request RSVP
+
+private struct RequestRsvpGroup: View {
+    @Bindable var viewModel: AddEventFormViewModel
+
+    var body: some View {
+        EventSection {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                ValueRow(label: "Request RSVP from attendees") {
+                    Toggle("", isOn: Binding(
+                        get: { viewModel.requestRsvp },
+                        set: { viewModel.setRequestRsvp($0) }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(SwitchToggleStyle(tint: Theme.Color.home))
+                    .accessibilityIdentifier("addEvent_requestRsvpToggle")
+                }
+                Text("Members get a Going / Maybe / Can't prompt")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
             }
         }
     }
@@ -463,10 +645,10 @@ private struct NotesGroup: View {
     @Bindable var viewModel: AddEventFormViewModel
 
     var body: some View {
-        FormFieldGroup("Notes") {
+        EventSection("Notes") {
             VStack(alignment: .leading, spacing: Spacing.s1) {
                 TextField(
-                    "Notes (optional)",
+                    "Add a note (optional)",
                     text: Binding(
                         get: { viewModel.fields[.notes]?.value ?? "" },
                         set: { viewModel.updateField(.notes, to: $0) }
@@ -499,35 +681,62 @@ private struct NotesGroup: View {
     }
 }
 
-// MARK: - Helpers
+// MARK: - Chip flow layout
 
-private struct PickerRow: View {
-    let label: String
-    let isSelected: Bool
-    let identifier: String
-    let onTap: @MainActor () -> Void
+/// Wrapping chip row matching the design's `ChipWrap`
+/// (`display:flex; flex-wrap:wrap; gap:7`).
+private struct ChipFlow: Layout {
+    var spacing: CGFloat
 
-    var body: some View {
-        Button {
-            onTap()
-        } label: {
-            HStack(spacing: Spacing.s3) {
-                Text(label)
-                    .pantopusTextStyle(.body)
-                    .foregroundStyle(Theme.Color.appText)
-                Spacer()
-                if isSelected {
-                    Icon(.check, size: 18, color: Theme.Color.primary600)
-                }
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout Void) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var rows = layoutRows(maxWidth: maxWidth, subviews: subviews)
+        let height = rows.isEmpty ? 0 : rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(rows.count - 1)
+        let width = rows.map(\.width).max() ?? 0
+        return CGSize(width: min(maxWidth, max(width, 0)), height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout Void) {
+        let rows = layoutRows(maxWidth: bounds.width, subviews: subviews)
+        var y = bounds.minY
+        for row in rows {
+            var x = bounds.minX
+            for item in row.items {
+                let size = subviews[item].sizeThatFits(.unspecified)
+                subviews[item].place(
+                    at: CGPoint(x: x, y: y),
+                    anchor: .topLeading,
+                    proposal: ProposedViewSize(size)
+                )
+                x += size.width + spacing
             }
-            .padding(.vertical, Spacing.s2)
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
+            y += row.height + spacing
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(identifier)
-        .accessibilityLabel(label)
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private struct Row { var items: [Int] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func layoutRows(maxWidth: CGFloat, subviews: Subviews) -> [Row] {
+        var rows: [Row] = []
+        var current = Row()
+        var x: CGFloat = 0
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            if x + size.width > maxWidth, !current.items.isEmpty {
+                rows.append(current)
+                current = Row()
+                x = 0
+            }
+            current.items.append(index)
+            x += size.width + spacing
+            current.width = max(current.width, x - spacing)
+            current.height = max(current.height, size.height)
+        }
+        if !current.items.isEmpty { rows.append(current) }
+        return rows
     }
 }
 

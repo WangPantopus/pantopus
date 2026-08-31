@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.homes.calendar
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -192,10 +193,12 @@ private fun WeekRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         days.forEach { day ->
-            val highlighted = isHighlighted(day, selectedIsoDate, todayIsoDate)
+            val isSelected = isHighlighted(day, selectedIsoDate, todayIsoDate)
+            val isToday = day.id == todayIsoDate
             DayCell(
                 day = day,
-                highlighted = highlighted,
+                isSelected = isSelected,
+                isToday = isToday,
                 onSelect = onSelect,
                 modifier = Modifier.weight(1f),
             )
@@ -217,32 +220,29 @@ private fun isHighlighted(
 @Composable
 private fun DayCell(
     day: MonthStripState.Day,
-    highlighted: Boolean,
+    isSelected: Boolean,
+    isToday: Boolean,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val backgroundColor = if (highlighted) PantopusColors.home else Color.Transparent
-    val dowColor =
-        if (highlighted) {
-            Color.White.copy(alpha = 0.85f)
-        } else {
-            PantopusColors.appTextMuted
-        }
-    val dateColor = if (highlighted) PantopusColors.appTextInverse else PantopusColors.appText
-    val dotColor = if (highlighted) Color.White.copy(alpha = 0.9f) else PantopusColors.home
+    // Spec: each date is a 30dp circular pill — solid green fill when selected,
+    // a 1.5dp green ring when it is today but a different day is selected.
+    val todayRing = isToday && !isSelected
+    val pillBackground = if (isSelected) PantopusColors.home else Color.Transparent
+    val dateColor = if (isSelected) PantopusColors.appTextInverse else PantopusColors.appText
+    val dotColor = if (isSelected) Color.White.copy(alpha = 0.9f) else PantopusColors.home
     val cellLabel = "${day.dayOfWeek} ${day.date} · ${day.eventCount} events"
 
     Column(
         modifier =
             modifier
                 .clip(RoundedCornerShape(Radii.sm))
-                .background(backgroundColor)
                 .clickable { onSelect(day.id) }
                 .padding(vertical = 6.dp)
                 .testTag("homeCalendar_day_${day.id}")
                 .semantics {
                     contentDescription = cellLabel
-                    selected = highlighted
+                    selected = isSelected
                 },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -251,16 +251,32 @@ private fun DayCell(
             text = day.dayOfWeek.uppercase(),
             fontSize = 10.sp,
             fontWeight = FontWeight.SemiBold,
-            color = dowColor,
+            color = PantopusColors.appTextMuted,
             textAlign = TextAlign.Center,
         )
-        Text(
-            text = day.date.toString(),
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = dateColor,
-            textAlign = TextAlign.Center,
-        )
+        Box(
+            modifier =
+                Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(pillBackground)
+                    .then(
+                        if (todayRing) {
+                            Modifier.border(1.5.dp, PantopusColors.home, CircleShape)
+                        } else {
+                            Modifier
+                        },
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = day.date.toString(),
+                fontSize = 14.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                color = dateColor,
+                textAlign = TextAlign.Center,
+            )
+        }
         DotsRow(eventCount = day.eventCount, dotColor = dotColor)
     }
 }

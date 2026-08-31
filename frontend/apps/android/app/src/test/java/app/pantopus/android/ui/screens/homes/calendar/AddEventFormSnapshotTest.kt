@@ -18,15 +18,10 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 
 /**
- * Paparazzi snapshots for the P2.7 Add Event form. Locks the four
- * design-spec poses:
- *  - **empty** (fresh form, Add disabled),
- *  - **all-day** (toggle on, time pickers hidden),
- *  - **with-attendees** (multi-pick populated, two selected),
- *  - **recurring** (Weekly selected + 1h reminder).
- *
- * The screen-level [AddEventFormScreen] depends on Hilt; these tests
- * render the stateless [AddEventFormBody] against fixture state instead.
+ * Paparazzi snapshots for the A10 Add / Edit Event form. Locks the design poses:
+ * empty (Save disabled), all-day, with-attendees (+ request-RSVP), recurring.
+ * Renders the stateless [AddEventFormBody] against fixture state (the screen-level
+ * composable depends on Hilt).
  */
 class AddEventFormSnapshotTest {
     @get:Rule
@@ -40,129 +35,82 @@ class AddEventFormSnapshotTest {
         )
 
     private val zone: ZoneId = ZoneId.of("UTC")
-    private val anchor =
-        LocalDateTime.of(2025, 10, 12, 16, 0).atZone(zone)
+    private val anchor = LocalDateTime.of(2025, 10, 12, 16, 0).atZone(zone)
 
     @Test
     fun add_event_empty_pose() {
-        paparazzi.snapshot {
-            Frame {
-                AddEventFormBody(
-                    state =
-                        baselineState(
-                            title = "",
-                        ),
-                    onClose = {},
-                    onCommit = {},
-                    onUpdateField = { _, _ -> },
-                    onSelectCategory = {},
-                    onAllDay = {},
-                    onSetStart = {},
-                    onSetEndEnabled = {},
-                    onSetEnd = {},
-                    onSetRecurrence = {},
-                    onSetReminder = {},
-                    onToggleAttendee = {},
-                )
-            }
-        }
+        snapshot(baselineState(title = ""))
     }
 
     @Test
     fun add_event_all_day_pose() {
-        paparazzi.snapshot {
-            Frame {
-                AddEventFormBody(
-                    state =
-                        baselineState(
-                            title = "Mom turns 62",
-                            category = CalendarEventCategory.Birthday,
-                            allDay = true,
-                            start = anchor.toLocalDate().atStartOfDay(zone),
-                            recurrence = AddEventRecurrence.Yearly,
-                            isDirty = true,
-                        ),
-                    onClose = {},
-                    onCommit = {},
-                    onUpdateField = { _, _ -> },
-                    onSelectCategory = {},
-                    onAllDay = {},
-                    onSetStart = {},
-                    onSetEndEnabled = {},
-                    onSetEnd = {},
-                    onSetRecurrence = {},
-                    onSetReminder = {},
-                    onToggleAttendee = {},
-                )
-            }
-        }
+        snapshot(
+            baselineState(
+                title = "Mom turns 62",
+                category = CalendarEventCategory.Birthday,
+                allDay = true,
+                start = anchor.toLocalDate().atStartOfDay(zone),
+                end = null,
+                recurrence = AddEventRecurrence.Monthly,
+                isDirty = true,
+            ),
+        )
     }
 
     @Test
     fun add_event_with_attendees_pose() {
-        val attendees =
-            listOf(
-                AddEventAttendee(id = "u1", displayName = "Maria Patel", initials = "MP"),
-                AddEventAttendee(id = "u2", displayName = "John Patel", initials = "JP"),
-                AddEventAttendee(id = "u3", displayName = "Ava Patel", initials = "AP"),
-            )
-        paparazzi.snapshot {
-            Frame {
-                AddEventFormBody(
-                    state =
-                        baselineState(
-                            title = "Soccer game · Ava",
-                            category = CalendarEventCategory.Social,
-                            start = anchor,
-                            end = anchor.plusHours(1).plusMinutes(30),
-                            attendees = attendees,
-                            selectedAttendees = setOf("u1", "u3"),
-                            location = "Riverside Field 3",
-                            reminder = AddEventReminder.OneHour,
-                            isDirty = true,
-                        ),
-                    onClose = {},
-                    onCommit = {},
-                    onUpdateField = { _, _ -> },
-                    onSelectCategory = {},
-                    onAllDay = {},
-                    onSetStart = {},
-                    onSetEndEnabled = {},
-                    onSetEnd = {},
-                    onSetRecurrence = {},
-                    onSetReminder = {},
-                    onToggleAttendee = {},
-                )
-            }
-        }
+        snapshot(
+            baselineState(
+                title = "Family dinner",
+                category = CalendarEventCategory.Meal,
+                start = anchor,
+                end = anchor.plusHours(1),
+                attendees =
+                    listOf(
+                        AddEventAttendee(id = "u1", displayName = "Maria Patel", initials = "MP"),
+                        AddEventAttendee(id = "u2", displayName = "John Patel", initials = "JP"),
+                        AddEventAttendee(id = "u3", displayName = "Ava Patel", initials = "AP"),
+                    ),
+                selectedAttendees = setOf("u1", "u3"),
+                reminderOffsets = setOf(AddEventReminderOffset.OneHour),
+                requestRsvp = true,
+                isDirty = true,
+            ),
+        )
     }
 
     @Test
     fun add_event_recurring_pose() {
+        snapshot(
+            baselineState(
+                title = "Trash & recycling out",
+                category = CalendarEventCategory.Chore,
+                start = anchor,
+                end = anchor.plusMinutes(15),
+                recurrence = AddEventRecurrence.Weekly,
+                reminderOffsets = setOf(AddEventReminderOffset.AtTime, AddEventReminderOffset.TenMin),
+                isDirty = true,
+            ),
+        )
+    }
+
+    private fun snapshot(state: AddEventUiState) {
         paparazzi.snapshot {
             Frame {
                 AddEventFormBody(
-                    state =
-                        baselineState(
-                            title = "Trash & recycling out",
-                            category = CalendarEventCategory.Trash,
-                            start = anchor,
-                            end = anchor.plusMinutes(15),
-                            recurrence = AddEventRecurrence.Weekly,
-                            reminder = AddEventReminder.FifteenMin,
-                            isDirty = true,
-                        ),
+                    state = state,
+                    offline = false,
                     onClose = {},
                     onCommit = {},
                     onUpdateField = { _, _ -> },
                     onSelectCategory = {},
                     onAllDay = {},
                     onSetStart = {},
-                    onSetEndEnabled = {},
                     onSetEnd = {},
                     onSetRecurrence = {},
-                    onSetReminder = {},
+                    onToggleReminder = {},
                     onToggleAttendee = {},
+                    onSetRequestRsvp = {},
                 )
             }
         }
@@ -171,12 +119,7 @@ class AddEventFormSnapshotTest {
     @Composable
     private fun Frame(content: @Composable () -> Unit) {
         PantopusTheme {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(PantopusColors.appBg),
-            ) { content() }
+            Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) { content() }
         }
     }
 
@@ -187,9 +130,10 @@ class AddEventFormSnapshotTest {
         category: CalendarEventCategory = CalendarEventCategory.Generic,
         allDay: Boolean = false,
         start: java.time.ZonedDateTime = anchor,
-        end: java.time.ZonedDateTime? = null,
+        end: java.time.ZonedDateTime? = anchor.plusHours(1),
         recurrence: AddEventRecurrence = AddEventRecurrence.None,
-        reminder: AddEventReminder = AddEventReminder.None,
+        reminderOffsets: Set<AddEventReminderOffset> = setOf(AddEventReminderOffset.TenMin),
+        requestRsvp: Boolean = false,
         attendees: List<AddEventAttendee> = emptyList(),
         selectedAttendees: Set<String> = emptySet(),
         isDirty: Boolean = false,
@@ -202,18 +146,8 @@ class AddEventFormSnapshotTest {
                 touched = isDirty,
                 error = null,
             )
-        val locationField =
-            FormFieldState(
-                id = AddEventField.Location.key,
-                value = location,
-                originalValue = location,
-            )
-        val notesField =
-            FormFieldState(
-                id = AddEventField.Notes.key,
-                value = notes,
-                originalValue = notes,
-            )
+        val locationField = FormFieldState(id = AddEventField.Location.key, value = location, originalValue = location)
+        val notesField = FormFieldState(id = AddEventField.Notes.key, value = notes, originalValue = notes)
         return AddEventUiState(
             fields =
                 mapOf(
@@ -226,7 +160,8 @@ class AddEventFormSnapshotTest {
             startDate = start,
             endDate = end,
             recurrence = recurrence,
-            reminder = reminder,
+            reminderOffsets = reminderOffsets,
+            requestRsvp = requestRsvp,
             attendees = attendees,
             selectedAttendeeIds = selectedAttendees,
             isEditing = false,
@@ -241,7 +176,8 @@ class AddEventFormSnapshotTest {
                     start = start,
                     end = null,
                     recurrence = AddEventRecurrence.None,
-                    reminder = AddEventReminder.None,
+                    reminderOffsets = setOf(AddEventReminderOffset.TenMin),
+                    requestRsvp = false,
                     attendees = emptySet(),
                 ),
         )

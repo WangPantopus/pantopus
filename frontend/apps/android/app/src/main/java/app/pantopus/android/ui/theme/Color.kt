@@ -40,6 +40,19 @@ object PantopusColors {
     val warning = Color(0xFFD97706)
     val warningLight = Color(0xFFFDE68A)
     val warningBg = Color(0xFFFFFBEB)
+
+    /**
+     * Warning-card title text — `#92400E` (Tailwind amber-800). The design's
+     * amber cards (weekly-hours `WarningCard`, block-time `ConflictCard` link)
+     * set their heading in this deeper amber, not the [warning] icon accent.
+     */
+    val warningStrong = Color(0xFF92400E)
+
+    /**
+     * Warning-card body text — `#78350F` (Tailwind amber-900). Pairs with
+     * [warningStrong] on [warningBg] surfaces.
+     */
+    val warningDeep = Color(0xFF78350F)
     val error = Color(0xFFDC2626)
     val errorLight = Color(0xFFFECACA)
     val errorBg = Color(0xFFFEF2F2)
@@ -83,6 +96,19 @@ object PantopusColors {
      * dashed callouts in the support-train wizard).
      */
     val warmAmberBg = Color(0xFFFEF3C7)
+
+    /**
+     * Warm-amber card fill — `#FFFBEB`. Tailwind amber-50; the Calendarly hub
+     * frames' `warningSoft` (paused banner surface). Softer than [warmAmberBg],
+     * which those frames reserve for icon tiles.
+     */
+    val warmAmberSoft = Color(0xFFFFFBEB)
+
+    /**
+     * Warm-amber border — `#FDE68A`. Tailwind amber-200; the Calendarly hub
+     * frames' `warningBorder` (paused pill + banner outlines around [warmAmber]).
+     */
+    val warmAmberBorder = Color(0xFFFDE68A)
 
     // T6.0b — Magic Task lavender quartet. Signals AI-resolved metadata
     // on My tasks V2 rows and the Magic ingest FAB on Mailbox-A17 root.
