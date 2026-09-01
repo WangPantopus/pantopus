@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.audience_profile.compose_broadcast
 
 import androidx.compose.runtime.Immutable
+import app.pantopus.android.ui.screens.compose.placepicker.MediaCaptureLocation
 import app.pantopus.android.ui.screens.compose.placepicker.PostPlaceTag
 import app.pantopus.android.ui.screens.identity_center.IdentityKind
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -41,6 +42,10 @@ enum class BroadcastAudience(
  * back to a tinted placeholder, keeping baselines deterministic.
  * [remoteUrl] is set only for already-hosted media, which rides the
  * publish body's `media[]` field instead of the upload leg.
+ * [capturedLatitude]/[capturedLongitude] are the capture coordinates
+ * extracted at pick time (EXIF for stills, the ISO-6709 atom for
+ * videos; mirrors the iOS `ComposeMediaPreview` fields) — a LOCAL
+ * place-picker anchor input only, never sent on the publish body.
  */
 @Immutable
 data class ComposeMediaPreview(
@@ -51,6 +56,8 @@ data class ComposeMediaPreview(
     val remoteUrl: String? = null,
     val fileName: String? = null,
     val mimeType: String? = null,
+    val capturedLatitude: Double? = null,
+    val capturedLongitude: Double? = null,
 ) {
     enum class Kind { Image, Video }
 
@@ -73,6 +80,8 @@ data class ComposeMediaPreview(
                     remoteUrl == other.remoteUrl &&
                     fileName == other.fileName &&
                     mimeType == other.mimeType &&
+                    capturedLatitude == other.capturedLatitude &&
+                    capturedLongitude == other.capturedLongitude &&
                     bytesEqual(bytes, other.bytes)
             )
 
@@ -81,6 +90,8 @@ data class ComposeMediaPreview(
         result = 31 * result + kind.hashCode()
         result = 31 * result + (caption?.hashCode() ?: 0)
         result = 31 * result + (remoteUrl?.hashCode() ?: 0)
+        result = 31 * result + (capturedLatitude?.hashCode() ?: 0)
+        result = 31 * result + (capturedLongitude?.hashCode() ?: 0)
         result = 31 * result + (bytes?.contentHashCode() ?: 0)
         return result
     }
@@ -110,6 +121,26 @@ data class ComposeBroadcastDraft(
 
     /** Free attachment slots left before the nine-item cap. */
     val remainingMediaSlots: Int get() = (MEDIA_LIMIT - media.size).coerceAtLeast(0)
+
+    /**
+     * ADDENDUM 2 — capture location of the first geotagged attachment:
+     * stills in attach order first, then videos (first geotagged item
+     * wins, matching Instagram/iOS). Recomputed on every media
+     * add/remove because it derives from [media]; nil when nothing is
+     * geotagged. PRIVACY: a local place-picker anchor input only — it
+     * never rides the publish body, which carries only an explicitly
+     * picked venue.
+     */
+    val mediaCaptureLocation: MediaCaptureLocation?
+        get() =
+            (
+                media.filter { it.kind == ComposeMediaPreview.Kind.Image } +
+                    media.filter { it.kind == ComposeMediaPreview.Kind.Video }
+            ).firstNotNullOfOrNull { item ->
+                val lat = item.capturedLatitude
+                val lng = item.capturedLongitude
+                if (lat != null && lng != null) MediaCaptureLocation(latitude = lat, longitude = lng) else null
+            }
 
     companion object {
         /**

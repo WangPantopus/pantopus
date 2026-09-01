@@ -207,10 +207,21 @@ public enum PulseAskCategory: String, CaseIterable, Sendable, Hashable {
 public struct PulseComposePhoto: Identifiable, Sendable, Hashable {
     public let id: UUID
     public let data: Data
+    /// Where the photo was captured (EXIF GPS), when present. A local
+    /// place-picker anchor hint ONLY — never sent on any request.
+    public let capturedLatitude: Double?
+    public let capturedLongitude: Double?
 
-    public init(id: UUID = UUID(), data: Data) {
+    public init(
+        id: UUID = UUID(),
+        data: Data,
+        capturedLatitude: Double? = nil,
+        capturedLongitude: Double? = nil
+    ) {
         self.id = id
         self.data = data
+        self.capturedLatitude = capturedLatitude
+        self.capturedLongitude = capturedLongitude
     }
 }
 
@@ -489,6 +500,21 @@ public final class PulseComposeViewModel {
 
     public func remove(photo id: UUID) {
         photos.removeAll { $0.id == id }
+    }
+
+    /// Capture location of the FIRST geotagged attachment — passed to
+    /// `PlacePickerSheet` as its "Photo location" anchor. Derived from
+    /// `photos`, so it recomputes on every add / remove and clears when
+    /// the last geotagged photo goes. PRIVACY: a local picker anchor
+    /// ONLY — never attached to the outgoing request (`applyPlaceTag`
+    /// sends just the explicitly picked venue).
+    public var mediaCaptureLocation: MediaCaptureLocation? {
+        for photo in photos {
+            if let latitude = photo.capturedLatitude, let longitude = photo.capturedLongitude {
+                return MediaCaptureLocation(latitude: latitude, longitude: longitude)
+            }
+        }
+        return nil
     }
 
     // MARK: - Place tag

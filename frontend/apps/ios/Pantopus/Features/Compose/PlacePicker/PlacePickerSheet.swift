@@ -4,8 +4,10 @@
 //
 //  Instagram-style "Add location" picker, shared by the Pulse composer
 //  and the Beacon broadcast composer. A searchable bottom sheet: nearby
-//  named POIs + the enclosing locality around the device fix, with a
-//  debounced place search on top. Chrome mirrors
+//  named POIs + the enclosing locality around the active anchor (media
+//  capture location when geotagged media is attached — switchable via
+//  the "Photo location" / "Near me" chips — the device fix otherwise),
+//  with a debounced place search on top. Chrome mirrors
 //  `TimezoneSelectorSheet` (header w/ Done, sunken search field,
 //  overline section headers, bordered list card).
 //
@@ -22,13 +24,19 @@ public struct PlacePickerSheet: View {
     private let onRemove: () -> Void
     private let onDismiss: () -> Void
 
+    /// - Parameter mediaLocation: capture location of the composer's
+    ///   first geotagged attachment. Non-nil renders the "Photo
+    ///   location" / "Near me" anchor chips with the photo anchor
+    ///   selected by default; nil keeps today's device-fix flow with
+    ///   zero visual delta.
     public init(
         currentTag: PostPlaceTag?,
+        mediaLocation: MediaCaptureLocation? = nil,
         onSelect: @escaping (PostPlaceTag) -> Void,
         onRemove: @escaping () -> Void,
         onDismiss: @escaping () -> Void
     ) {
-        _viewModel = State(initialValue: PlacePickerViewModel())
+        _viewModel = State(initialValue: PlacePickerViewModel(mediaLocation: mediaLocation))
         self.currentTag = currentTag
         self.onSelect = onSelect
         self.onRemove = onRemove
@@ -54,6 +62,9 @@ public struct PlacePickerSheet: View {
         VStack(spacing: Spacing.s0) {
             header
             searchField
+            if viewModel.hasMediaAnchor {
+                anchorChips
+            }
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Spacing.s2) {
                     listArea
@@ -114,6 +125,49 @@ public struct PlacePickerSheet: View {
         .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
         .padding(.horizontal, Spacing.s4)
         .padding(.bottom, Spacing.s2)
+    }
+
+    /// Anchor chips — rendered only when geotagged media supplied a
+    /// capture location. "Photo location" anchors the nearby list +
+    /// search proximity on the media's capture point; "Near me" on the
+    /// device fix (falling back to the search-only hint when no fix
+    /// resolves, while this chip row stays live).
+    private var anchorChips: some View {
+        HStack(spacing: Spacing.s2) {
+            anchorChip(.media, label: "Photo location", identifier: "placePickerAnchorPhoto")
+            anchorChip(.current, label: "Near me", identifier: "placePickerAnchorCurrent")
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(.horizontal, Spacing.s4)
+        .padding(.bottom, Spacing.s2)
+    }
+
+    /// Selectable pill mirroring the composer's `chipPill` styling.
+    private func anchorChip(
+        _ anchor: PlacePickerAnchor,
+        label: String,
+        identifier: String
+    ) -> some View {
+        let isActive = viewModel.activeAnchor == anchor
+        return Button {
+            Task { await viewModel.selectAnchor(anchor) }
+        } label: {
+            Text(label)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(isActive ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
+                .padding(.horizontal, Spacing.s3)
+                .frame(minHeight: 30)
+                .background(isActive ? Theme.Color.primary600 : Theme.Color.appSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                        .stroke(isActive ? .clear : Theme.Color.appBorder, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
+        .accessibilityIdentifier(identifier)
     }
 
     // MARK: - List area

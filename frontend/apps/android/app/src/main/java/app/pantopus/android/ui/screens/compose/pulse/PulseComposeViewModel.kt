@@ -28,6 +28,7 @@ import app.pantopus.android.data.posts.PostPrecheckRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import app.pantopus.android.data.upload.UploadRepository
+import app.pantopus.android.ui.screens.compose.placepicker.MediaCaptureLocation
 import app.pantopus.android.ui.screens.compose.placepicker.PostPlaceTag
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.shared.form.FormAggregate
@@ -168,10 +169,18 @@ enum class PulseAskCategory(val key: String, val label: String) {
     Other("other", "Other"),
 }
 
-/** One picked photo. Carries the bytes + a stable id for ForEach. */
+/**
+ * One picked photo. Carries the bytes + a stable id for ForEach.
+ * [capturedLatitude]/[capturedLongitude] are the EXIF capture
+ * coordinates extracted at pick time (mirrors the iOS
+ * `PulseComposePhoto` fields) — a LOCAL place-picker anchor input only,
+ * never attached to the outgoing post body.
+ */
 data class PulseComposePhoto(
     val id: String,
     val data: ByteArray,
+    val capturedLatitude: Double? = null,
+    val capturedLongitude: Double? = null,
 ) {
     override fun equals(other: Any?): Boolean = other is PulseComposePhoto && other.id == id
 
@@ -591,6 +600,22 @@ class PulseComposeViewModel
                     null
                 }
         }
+
+        /**
+         * ADDENDUM 2 — capture location of the first geotagged attachment
+         * (in attach order), recomputed on every photo add/remove and nil
+         * when nothing is geotagged. Seeds the PlacePickerSheet's "Photo
+         * location" anchor. PRIVACY: a local anchor input only — it is
+         * NEVER written onto the outgoing request (the post carries only
+         * an explicitly picked venue).
+         */
+        val mediaCaptureLocation: MediaCaptureLocation?
+            get() =
+                _photos.value.firstNotNullOfOrNull { photo ->
+                    val lat = photo.capturedLatitude
+                    val lng = photo.capturedLongitude
+                    if (lat != null && lng != null) MediaCaptureLocation(latitude = lat, longitude = lng) else null
+                }
 
         fun setPhotos(photos: List<PulseComposePhoto>) {
             _photos.value = photos.take(PULSE_COMPOSE_MAX_PHOTOS)

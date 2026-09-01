@@ -14,6 +14,7 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.audience.AudienceProfileRepository
 import app.pantopus.android.data.upload.UploadFile
 import app.pantopus.android.data.upload.UploadRepository
+import app.pantopus.android.ui.screens.compose.placepicker.MediaCaptureLocation
 import app.pantopus.android.ui.screens.compose.placepicker.PostPlaceTag
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -206,6 +207,15 @@ class ComposeBroadcastViewModel
         }
 
         fun removeMedia(id: String) = mutateDraft { draft -> draft.copy(media = draft.media.filterNot { it.id == id }) }
+
+        /**
+         * ADDENDUM 2 — the draft's media capture anchor (first geotagged
+         * attachment, stills then videos), recomputed on every media
+         * add/remove. Seeds the PlacePickerSheet's "Photo location"
+         * chip; never part of the publish body.
+         */
+        val mediaCaptureLocation: MediaCaptureLocation?
+            get() = _state.value.draft.mediaCaptureLocation
 
         /** Instagram-style venue tag picked in the shared PlacePickerSheet. */
         fun selectPlaceTag(tag: PostPlaceTag) = mutateDraft { it.copy(placeTag = tag) }

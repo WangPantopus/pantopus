@@ -70,6 +70,7 @@ import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.components.Toast
 import app.pantopus.android.ui.components.ToastKind
 import app.pantopus.android.ui.components.ToastMessage
+import app.pantopus.android.ui.screens.compose.placepicker.MediaLocationExtractor
 import app.pantopus.android.ui.screens.compose.placepicker.PlacePickerSheet
 import app.pantopus.android.ui.screens.compose.placepicker.PostPlaceTag
 import app.pantopus.android.ui.screens.shared.form.FormFieldGroup
@@ -182,7 +183,23 @@ fun PulseComposeScreen(
                     withContext(Dispatchers.IO) {
                         uris.take(PULSE_COMPOSE_MAX_PHOTOS).mapNotNull { uri ->
                             readBytes(context.contentResolver, uri)?.let { bytes ->
-                                PulseComposePhoto(id = UUID.randomUUID().toString(), data = bytes)
+                                // Capture-location anchor (ADDENDUM 2):
+                                // EXIF GPS is read off the picked bytes as
+                                // a LOCAL place-picker anchor only — it is
+                                // never auto-attached to the outgoing post.
+                                // On API 29+ the system photo picker
+                                // redacts location EXIF at read time
+                                // (ACCESS_MEDIA_LOCATION does not apply to
+                                // picker URIs), so this legitimately
+                                // returns null there → no anchor chips;
+                                // API 26-28 bytes still carry GPS.
+                                val captured = MediaLocationExtractor.fromImageBytes(bytes)
+                                PulseComposePhoto(
+                                    id = UUID.randomUUID().toString(),
+                                    data = bytes,
+                                    capturedLatitude = captured?.latitude,
+                                    capturedLongitude = captured?.longitude,
+                                )
                             }
                         }
                     }
@@ -305,6 +322,10 @@ fun PulseComposeScreen(
     if (showPlacePicker) {
         PlacePickerSheet(
             currentTag = selectedPlaceTag,
+            // Media capture anchor, read at presentation time so it
+            // tracks the current photo set (the sheet re-seeds its VM on
+            // every open).
+            mediaLocation = viewModel.mediaCaptureLocation,
             onSelect = { tag ->
                 viewModel.selectPlaceTag(tag)
                 showPlacePicker = false

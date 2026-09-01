@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -55,9 +57,17 @@ import kotlin.math.roundToInt
 
 const val PLACE_PICKER_TAG = "placePickerSheet"
 
+/** Runtime prompt payload — fine first, coarse as the graceful fallback. */
+private val LOCATION_PERMISSIONS =
+    arrayOf(
+        Manifest.permission.ACCESS_FINE_LOCATION,
+        Manifest.permission.ACCESS_COARSE_LOCATION,
+    )
+
 private val ICON_SM = 16.dp
 private val ICON_LG = 24.dp
 private val ROW_MIN_HEIGHT = 44.dp
+private val ANCHOR_CHIP_MIN_HEIGHT = 32.dp
 private val NO_MATCH_CIRCLE = 52.dp
 private val HEADER_SPACER_WIDTH = 56.dp
 private val HAIRLINE = 1.dp
@@ -80,6 +90,13 @@ private const val SHORT_DISTANCE_MILES = 0.1
  * The runtime location prompt fires here (the `TasksMapScreen` launcher
  * pattern) because `DeviceLocationProvider` only *checks* permission;
  * denial degrades to search-only mode.
+ *
+ * ADDENDUM 2 — [mediaLocation] is the composer's media capture anchor
+ * (where the attached photo/video was taken). Non-null renders the
+ * "Photo location" / "Near me" chips, defaults the picker to the photo
+ * anchor, and skips the open-time permission prompt (the photo anchor
+ * needs no fix; "Near me" prompts on tap instead). PRIVACY: a local
+ * anchor input only — it never reaches an outgoing body.
  */
 @Composable
 fun PlacePickerSheet(
@@ -88,11 +105,13 @@ fun PlacePickerSheet(
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    mediaLocation: MediaCaptureLocation? = null,
     viewModel: PlacePickerViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
     val searchOnly by viewModel.searchOnly.collectAsStateWithLifecycle()
+    val anchor by viewModel.anchor.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     val permissionLauncher =
@@ -108,18 +127,19 @@ fun PlacePickerSheet(
 
     LaunchedEffect(Unit) {
         // The Hilt VM outlives sheet dismissals (it is scoped to the host
-        // screen) — clear any stale query so a reopen starts clean, like
-        // iOS's fresh per-presentation view-model.
+        // screen) — refresh the per-presentation inputs on every open:
+        // re-seed the media anchor from the CURRENT attachment set (not
+        // a value captured at VM construction) and clear any stale
+        // query, like iOS's fresh per-presentation view-model.
+        viewModel.setMediaLocation(mediaLocation)
         viewModel.onQueryChange("")
-        if (hasLocationPermission(context)) {
-            viewModel.load()
-        } else {
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                ),
-            )
+        when {
+            // Photo anchor needs no device fix — don't prompt for
+            // location permission just to open the sheet; the "Near me"
+            // chip prompts on tap.
+            mediaLocation != null -> viewModel.load()
+            hasLocationPermission(context) -> viewModel.load()
+            else -> permissionLauncher.launch(LOCATION_PERMISSIONS)
         }
     }
 
@@ -131,39 +151,72 @@ fun PlacePickerSheet(
     ) {
         Header(onDone = onDismiss)
         SearchBox(query = query, onQueryChange = viewModel::onQueryChange)
+        if (mediaLocation != null) {
+            // Rendered only when the media carries a capture location —
+            // untagged media keeps today's sheet byte-identical.
+            AnchorChips(
+                active = anchor,
+                onSelect = { selected ->
+                    viewModel.selectAnchor(selected)
+                    // "Near me" without permission asks now; denial falls
+                    // into search-only mode while the photo chip stays live.
+                    if (selected == PlacePickerAnchor.Current && !hasLocationPermission(context)) {
+                        permissionLauncher.launch(LOCATION_PERMISSIONS)
+                    }
+                },
+            )
+        }
         if (currentTag != null) {
             RemoveRow(tagName = currentTag.name, onRemove = onRemove)
         }
         // Header + search + remove row stay pinned; the list area scrolls
         // (nearby POIs + locality can exceed the sheet, especially with
         // the keyboard up) — mirrors the iOS ScrollView structure.
-        Column(
-            modifier =
-                Modifier
-                    .weight(1f, fill = false)
-                    .verticalScroll(rememberScrollState()),
-        ) {
-            when (val current = state) {
-                PlacePickerUiState.Loading -> SkeletonRows()
-                is PlacePickerUiState.Loaded ->
-                    when {
-                        searchOnly -> SearchOnlyHint()
-                        current.nearby.isEmpty() && current.locality == null -> NoNearbyPlaces()
-                        else ->
-                            NearbySection(
-                                nearby = current.nearby,
-                                locality = current.locality,
-                                onSelect = onSelect,
-                            )
-                    }
-                is PlacePickerUiState.SearchResults ->
-                    ResultsSection(places = current.places, onSelect = onSelect)
-                PlacePickerUiState.Empty -> NoMatch(query = query)
-                is PlacePickerUiState.Error ->
-                    ErrorCard(message = current.message, onRetry = viewModel::retry)
-            }
-            Spacer(modifier = Modifier.height(Spacing.s6))
+        ListArea(
+            state = state,
+            query = query,
+            searchOnly = searchOnly,
+            onSelect = onSelect,
+            onRetry = viewModel::retry,
+        )
+    }
+}
+
+/** The scrollable state-driven list body under the pinned chrome. */
+@Composable
+private fun ColumnScope.ListArea(
+    state: PlacePickerUiState,
+    query: String,
+    searchOnly: Boolean,
+    onSelect: (PostPlaceTag) -> Unit,
+    onRetry: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
+    ) {
+        when (val current = state) {
+            PlacePickerUiState.Loading -> SkeletonRows()
+            is PlacePickerUiState.Loaded ->
+                when {
+                    searchOnly -> SearchOnlyHint()
+                    current.nearby.isEmpty() && current.locality == null -> NoNearbyPlaces()
+                    else ->
+                        NearbySection(
+                            nearby = current.nearby,
+                            locality = current.locality,
+                            onSelect = onSelect,
+                        )
+                }
+            is PlacePickerUiState.SearchResults ->
+                ResultsSection(places = current.places, onSelect = onSelect)
+            PlacePickerUiState.Empty -> NoMatch(query = query)
+            is PlacePickerUiState.Error ->
+                ErrorCard(message = current.message, onRetry = onRetry)
         }
+        Spacer(modifier = Modifier.height(Spacing.s6))
     }
 }
 
@@ -250,6 +303,77 @@ private fun SearchBox(
                 modifier = Modifier.clickable { onQueryChange("") },
             )
         }
+    }
+}
+
+/**
+ * ADDENDUM 2 — capture-location anchor chips, shown below the search
+ * field when the composer's media is geotagged. "Photo location" (the
+ * default, Instagram behavior) anchors NEARBY + search proximity on
+ * where the media was taken; "Near me" is today's device-fix flow.
+ * testTags mirror the iOS ids 1:1.
+ */
+@Composable
+private fun AnchorChips(
+    active: PlacePickerAnchor,
+    onSelect: (PlacePickerAnchor) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s1),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        AnchorChip(
+            label = "Photo location",
+            icon = PantopusIcon.Image,
+            isActive = active == PlacePickerAnchor.Photo,
+            onClick = { onSelect(PlacePickerAnchor.Photo) },
+            modifier = Modifier.testTag("placePickerAnchorPhoto"),
+        )
+        AnchorChip(
+            label = "Near me",
+            icon = PantopusIcon.Navigation,
+            isActive = active == PlacePickerAnchor.Current,
+            onClick = { onSelect(PlacePickerAnchor.Current) },
+            modifier = Modifier.testTag("placePickerAnchorCurrent"),
+        )
+    }
+}
+
+@Composable
+private fun AnchorChip(
+    label: String,
+    icon: PantopusIcon,
+    isActive: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val fg = if (isActive) PantopusColors.appTextInverse else PantopusColors.appTextStrong
+    val bg = if (isActive) PantopusColors.primary600 else PantopusColors.appSurface
+    val border = if (isActive) Color.Transparent else PantopusColors.appBorder
+    Row(
+        modifier =
+            modifier
+                .heightIn(min = ANCHOR_CHIP_MIN_HEIGHT)
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(bg)
+                .border(HAIRLINE, border, RoundedCornerShape(Radii.pill))
+                .clickable(onClick = onClick)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s1),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        PantopusIconImage(
+            icon = icon,
+            contentDescription = null,
+            size = ICON_SM,
+            tint = fg,
+        )
+        Text(
+            text = label,
+            style = PantopusTextStyle.small,
+            fontWeight = FontWeight.SemiBold,
+            color = fg,
+        )
     }
 }
 

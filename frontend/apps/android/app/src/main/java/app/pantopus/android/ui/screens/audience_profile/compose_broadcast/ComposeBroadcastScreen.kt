@@ -63,6 +63,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.audience_profile.tierColor
+import app.pantopus.android.ui.screens.compose.placepicker.MediaLocationExtractor
 import app.pantopus.android.ui.screens.compose.placepicker.PlacePickerSheet
 import app.pantopus.android.ui.screens.compose.placepicker.PostPlaceTag
 import app.pantopus.android.ui.theme.PantopusColors
@@ -105,6 +106,9 @@ fun ComposeBroadcastScreen(
             scope.launch {
                 val picked =
                     withContext(Dispatchers.IO) {
+                        // Capture-location extraction runs AFTER the
+                        // take(remainingSlots) trim, so only attachments
+                        // that actually land in the draft are read.
                         uris.take(remainingSlots).mapNotNull { uri ->
                             val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
                             val bytes =
@@ -112,12 +116,33 @@ fun ComposeBroadcastScreen(
                                     context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                                 }.getOrNull() ?: return@mapNotNull null
                             val isVideo = mime.startsWith("video")
+                            // Capture-location anchor (ADDENDUM 2): a
+                            // LOCAL place-picker anchor only — never
+                            // auto-attached to the outgoing broadcast
+                            // body. Videos need the picker URI
+                            // (MediaMetadataRetriever can't read bytes),
+                            // so extraction happens here while the URI is
+                            // still in scope; the URI is not kept beyond
+                            // this callback. On API 29+ the system photo
+                            // picker redacts location metadata at read
+                            // time (ACCESS_MEDIA_LOCATION does not apply
+                            // to picker URIs), so this legitimately
+                            // returns null there → no anchor chips;
+                            // API 26-28 media still carries it.
+                            val captured =
+                                if (isVideo) {
+                                    MediaLocationExtractor.fromVideoUri(context, uri)
+                                } else {
+                                    MediaLocationExtractor.fromImageBytes(bytes)
+                                }
                             ComposeMediaPreview(
                                 id = uri.toString(),
                                 kind = if (isVideo) ComposeMediaPreview.Kind.Video else ComposeMediaPreview.Kind.Image,
                                 caption = if (isVideo) "Video attached" else "Photo attached",
                                 bytes = bytes,
                                 mimeType = mime,
+                                capturedLatitude = captured?.latitude,
+                                capturedLongitude = captured?.longitude,
                             )
                         }
                     }
@@ -158,6 +183,10 @@ fun ComposeBroadcastScreen(
     if (showPlacePicker) {
         PlacePickerSheet(
             currentTag = uiState.draft.placeTag,
+            // Media capture anchor, read at presentation time so it
+            // tracks the current attachment set (the sheet re-seeds its
+            // VM on every open).
+            mediaLocation = uiState.draft.mediaCaptureLocation,
             onSelect = { tag ->
                 viewModel.selectPlaceTag(tag)
                 showPlacePicker = false

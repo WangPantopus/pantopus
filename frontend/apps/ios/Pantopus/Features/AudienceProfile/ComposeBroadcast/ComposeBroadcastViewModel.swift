@@ -309,6 +309,23 @@ public final class ComposeBroadcastViewModel {
         draft.remainingMediaSlots
     }
 
+    /// Capture location of the first geotagged attachment — stills in
+    /// attach order first, then videos — passed to `PlacePickerSheet`
+    /// as its "Photo location" anchor. Derived from the draft's media,
+    /// so it recomputes on every add / remove. PRIVACY: a local picker
+    /// anchor ONLY — the publish body carries just the explicitly
+    /// picked venue, never this coordinate.
+    public var mediaCaptureLocation: MediaCaptureLocation? {
+        let stills = draft.media.filter { $0.kind == .image }
+        let videos = draft.media.filter { $0.kind == .video }
+        for item in stills + videos {
+            if let latitude = item.capturedLatitude, let longitude = item.capturedLongitude {
+                return MediaCaptureLocation(latitude: latitude, longitude: longitude)
+            }
+        }
+        return nil
+    }
+
     public func schedule(at date: Date) {
         scheduledAt = date
         recoverFromError()

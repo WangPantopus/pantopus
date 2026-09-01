@@ -58,6 +58,7 @@ public struct ComposeBroadcastView: View {
         .sheet(isPresented: $showsPlacePicker) {
             PlacePickerSheet(
                 currentTag: viewModel.selectedPlaceTag,
+                mediaLocation: viewModel.mediaCaptureLocation,
                 onSelect: { tag in
                     viewModel.selectPlaceTag(tag)
                     showsPlacePicker = false
@@ -763,12 +764,20 @@ public struct ComposeBroadcastView: View {
                 guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
                 let mime = item.supportedContentTypes.first?.preferredMIMEType
                     ?? (isVideo ? "video/mp4" : "image/jpeg")
+                // Off-main, failure-silent capture-location read. The
+                // coordinate is ONLY a local place-picker anchor — it
+                // never rides the publish body.
+                let capture = isVideo
+                    ? await MediaLocationExtractor.videoLocation(from: data)
+                    : await MediaLocationExtractor.imageLocation(from: data)
                 picked.append(
                     ComposeMediaPreview(
                         kind: isVideo ? .video : .image,
                         caption: isVideo ? "Video attached" : "Photo attached",
                         data: data,
-                        mimeType: mime
+                        mimeType: mime,
+                        capturedLatitude: capture?.latitude,
+                        capturedLongitude: capture?.longitude
                     )
                 )
             }

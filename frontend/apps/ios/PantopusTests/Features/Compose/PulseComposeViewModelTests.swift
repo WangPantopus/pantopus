@@ -347,6 +347,63 @@ final class PulseComposeViewModelTests: XCTestCase {
         XCTAssertFalse(vm.isDirty)
     }
 
+    // MARK: - Media capture location (ADDENDUM 2)
+
+    func testMediaCaptureLocationRecomputesOnAddAndRemove() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        XCTAssertNil(vm.mediaCaptureLocation)
+
+        // First GEOTAGGED photo wins, even when an untagged one precedes it.
+        let untagged = PulseComposePhoto(data: Data([0x1]))
+        let tagged = PulseComposePhoto(
+            data: Data([0x2]),
+            capturedLatitude: 41.8781,
+            capturedLongitude: -87.6298
+        )
+        vm.setPhotos([untagged, tagged])
+        XCTAssertEqual(vm.mediaCaptureLocation?.latitude ?? 0, 41.8781, accuracy: 0.0001)
+        XCTAssertEqual(vm.mediaCaptureLocation?.longitude ?? 0, -87.6298, accuracy: 0.0001)
+
+        // Removing the geotagged photo clears the anchor.
+        vm.remove(photo: tagged.id)
+        XCTAssertNil(vm.mediaCaptureLocation)
+        vm.remove(photo: untagged.id)
+        XCTAssertNil(vm.mediaCaptureLocation)
+    }
+
+    func testMediaCaptureLocationPrefersEarliestGeotaggedPhoto() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        vm.append(photo: PulseComposePhoto(
+            data: Data([0x1]),
+            capturedLatitude: 41.8781,
+            capturedLongitude: -87.6298
+        ))
+        vm.append(photo: PulseComposePhoto(
+            data: Data([0x2]),
+            capturedLatitude: 30.2672,
+            capturedLongitude: -97.7431
+        ))
+        XCTAssertEqual(vm.mediaCaptureLocation?.latitude ?? 0, 41.8781, accuracy: 0.0001)
+    }
+
+    /// PRIVACY: the media capture location never leaks onto the outgoing
+    /// request — the body carries only an explicitly picked venue.
+    func testMediaCaptureLocationNeverRidesTheRequest() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        vm.update(.title, to: "Need a plumber")
+        vm.update(.body, to: "Pipe is leaking.")
+        vm.setPhotos([PulseComposePhoto(
+            data: Data([0x2]),
+            capturedLatitude: 41.8781,
+            capturedLongitude: -87.6298
+        )])
+        let request = vm.buildRequest()
+        XCTAssertNil(request.latitude)
+        XCTAssertNil(request.longitude)
+        XCTAssertNil(request.locationName)
+        XCTAssertNil(request.geocodePlaceId)
+    }
+
     // MARK: - Submit pipeline
 
     func testSubmitHappyPathSucceedsAndDismisses() async {

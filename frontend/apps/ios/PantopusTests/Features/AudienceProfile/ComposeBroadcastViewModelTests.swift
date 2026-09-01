@@ -132,6 +132,47 @@ final class ComposeBroadcastViewModelTests: XCTestCase {
         XCTAssertNil(vm.selectedPlaceTag)
     }
 
+    // MARK: - Media capture location (ADDENDUM 2)
+
+    func testMediaCaptureLocationPrefersStillsOverVideosAndRecomputes() {
+        let vm = makeVM()
+        XCTAssertNil(vm.mediaCaptureLocation)
+
+        // Video-only → the video's capture point anchors.
+        vm.attachMedia(ComposeMediaPreview(
+            id: "v1",
+            kind: .video,
+            caption: nil,
+            capturedLatitude: 30.2672,
+            capturedLongitude: -97.7431
+        ))
+        XCTAssertEqual(vm.mediaCaptureLocation?.latitude ?? 0, 30.2672, accuracy: 0.0001)
+
+        // A geotagged STILL wins over the earlier-attached video.
+        vm.attachMedia(ComposeMediaPreview(
+            id: "i1",
+            kind: .image,
+            caption: nil,
+            capturedLatitude: 41.8781,
+            capturedLongitude: -87.6298
+        ))
+        XCTAssertEqual(vm.mediaCaptureLocation?.latitude ?? 0, 41.8781, accuracy: 0.0001)
+        XCTAssertEqual(vm.mediaCaptureLocation?.longitude ?? 0, -87.6298, accuracy: 0.0001)
+
+        // Removing the still falls back to the video; clearing all clears.
+        vm.removeMedia(id: "i1")
+        XCTAssertEqual(vm.mediaCaptureLocation?.latitude ?? 0, 30.2672, accuracy: 0.0001)
+        vm.removeMedia()
+        XCTAssertNil(vm.mediaCaptureLocation)
+    }
+
+    func testUntaggedMediaExposesNoCaptureLocation() {
+        let vm = makeVM()
+        vm.attachMedia(ComposeMediaPreview(kind: .image, caption: nil))
+        vm.attachMedia(ComposeMediaPreview(kind: .video, caption: nil))
+        XCTAssertNil(vm.mediaCaptureLocation, "no geotag → no anchor chips")
+    }
+
     /// Wire contract for B5 — snake_case keys, nils dropped (the
     /// broadcast schema is a CLOSED Joi object that rejects `null`s).
     func testPublishBodyEncodesPlaceTagSnakeCaseAndDropsNils() throws {

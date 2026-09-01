@@ -11,9 +11,11 @@ import app.pantopus.android.data.api.models.audience.PersonaMeResponse
 import app.pantopus.android.data.api.models.audience.PersonaSummaryDto
 import app.pantopus.android.data.api.models.audience.PublishUpdateBody
 import app.pantopus.android.data.api.models.audience.PublishUpdateResponse
+import app.pantopus.android.data.api.models.posts.PostMediaUploadResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.audience.AudienceProfileRepository
 import app.pantopus.android.data.upload.UploadRepository
+import app.pantopus.android.ui.screens.compose.placepicker.MediaCaptureLocation
 import app.pantopus.android.ui.screens.compose.placepicker.PostPlaceTag
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -296,6 +298,98 @@ class ComposeBroadcastViewModelTest {
             vm.load()
             advanceUntilIdle()
             vm.updateBody("No venue this time.")
+            vm.send()
+            advanceUntilIdle()
+            assertNull(body.captured.latitude)
+            assertNull(body.captured.longitude)
+            assertNull(body.captured.locationName)
+            assertNull(body.captured.locationAddress)
+            assertNull(body.captured.placeId)
+        }
+
+    // MARK: - Media capture location (ADDENDUM 2)
+
+    @Test
+    fun `media capture location prefers stills over earlier videos`() {
+        val vm = buildVm()
+        assertNull(vm.mediaCaptureLocation)
+        vm.attachMedia(
+            ComposeMediaPreview(
+                id = "v1",
+                kind = ComposeMediaPreview.Kind.Video,
+                caption = null,
+                capturedLatitude = 10.0,
+                capturedLongitude = 20.0,
+            ),
+        )
+        vm.attachMedia(
+            ComposeMediaPreview(
+                id = "i1",
+                kind = ComposeMediaPreview.Kind.Image,
+                caption = null,
+                capturedLatitude = 41.8781,
+                capturedLongitude = -87.6298,
+            ),
+        )
+        // Stills first (in attach order), then videos — the later still
+        // outranks the earlier geotagged video.
+        assertEquals(MediaCaptureLocation(latitude = 41.8781, longitude = -87.6298), vm.mediaCaptureLocation)
+
+        // Recomputed on every remove; nil once nothing geotagged remains.
+        vm.removeMedia("i1")
+        assertEquals(MediaCaptureLocation(latitude = 10.0, longitude = 20.0), vm.mediaCaptureLocation)
+        vm.removeMedia("v1")
+        assertNull(vm.mediaCaptureLocation)
+    }
+
+    @Test
+    fun `untagged media exposes no capture location`() {
+        val vm = buildVm()
+        vm.attachMedia(ComposeMediaPreview(id = "i1", kind = ComposeMediaPreview.Kind.Image, caption = null))
+        assertNull(vm.mediaCaptureLocation)
+        // One coordinate alone is not a usable anchor.
+        vm.attachMedia(
+            ComposeMediaPreview(
+                id = "i2",
+                kind = ComposeMediaPreview.Kind.Image,
+                caption = null,
+                capturedLatitude = 41.8781,
+            ),
+        )
+        assertNull(vm.mediaCaptureLocation)
+    }
+
+    @Test
+    fun `media capture location never rides the publish body`() =
+        runTest(dispatcher) {
+            // PRIVACY RULE — media GPS is a local picker anchor only; the
+            // wire body carries location keys only for an explicit pick.
+            val body = slot<PublishUpdateBody>()
+            stubPublishLegs(body)
+            val vm = buildVm()
+            vm.load()
+            advanceUntilIdle()
+            vm.updateBody("Geotagged photo attached.")
+            vm.attachMedia(
+                ComposeMediaPreview(
+                    id = "i1",
+                    kind = ComposeMediaPreview.Kind.Image,
+                    caption = null,
+                    bytes = byteArrayOf(1),
+                    capturedLatitude = 41.8781,
+                    capturedLongitude = -87.6298,
+                ),
+            )
+            coEvery { uploadRepository.uploadPostMediaFiles(any(), any()) } returns
+                NetworkResult.Success(
+                    PostMediaUploadResponse(
+                        message = "ok",
+                        mediaUrls = emptyList(),
+                        mediaTypes = emptyList(),
+                        mediaThumbnails = emptyList(),
+                        mediaLiveUrls = emptyList(),
+                    ),
+                )
             vm.send()
             advanceUntilIdle()
             assertNull(body.captured.latitude)

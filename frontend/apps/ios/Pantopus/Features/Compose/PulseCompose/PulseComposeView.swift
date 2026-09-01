@@ -101,6 +101,7 @@ public struct PulseComposeView: View {
         .sheet(isPresented: $showsPlacePicker) {
             PlacePickerSheet(
                 currentTag: viewModel.selectedPlaceTag,
+                mediaLocation: viewModel.mediaCaptureLocation,
                 onSelect: { tag in
                     viewModel.selectPlaceTag(tag)
                     showsPlacePicker = false
@@ -207,7 +208,15 @@ public struct PulseComposeView: View {
             var loaded: [PulseComposePhoto] = []
             for item in items.prefix(pulseComposeMaxPhotos) {
                 if let data = try? await item.loadTransferable(type: Data.self) {
-                    loaded.append(PulseComposePhoto(data: data))
+                    // Off-main, failure-silent EXIF read. The capture
+                    // location is ONLY a local place-picker anchor —
+                    // it is never attached to the outgoing post.
+                    let capture = await MediaLocationExtractor.imageLocation(from: data)
+                    loaded.append(PulseComposePhoto(
+                        data: data,
+                        capturedLatitude: capture?.latitude,
+                        capturedLongitude: capture?.longitude
+                    ))
                 }
             }
             await MainActor.run {
