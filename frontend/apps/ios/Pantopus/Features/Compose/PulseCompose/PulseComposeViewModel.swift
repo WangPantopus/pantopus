@@ -312,6 +312,11 @@ public final class PulseComposeViewModel {
     /// Currently selected photos — capped at `pulseComposeMaxPhotos`.
     public private(set) var photos: [PulseComposePhoto] = []
 
+    /// Instagram-style place tag picked in `PlacePickerSheet`. Applied
+    /// as the LAST step of the request build so it wins over the flow
+    /// target's location fields.
+    public private(set) var selectedPlaceTag: PostPlaceTag?
+
     /// Toast surfaced by the view for errors + validation hints.
     public var toast: ToastMessage?
 
@@ -486,6 +491,16 @@ public final class PulseComposeViewModel {
         photos.removeAll { $0.id == id }
     }
 
+    // MARK: - Place tag
+
+    public func selectPlaceTag(_ tag: PostPlaceTag) {
+        selectedPlaceTag = tag
+    }
+
+    public func clearPlaceTag() {
+        selectedPlaceTag = nil
+    }
+
     // MARK: - Dirty + validity
 
     /// True iff any user-editable field has diverged from its baseline
@@ -494,6 +509,9 @@ public final class PulseComposeViewModel {
     /// mode `loadForEdit` rebases the baselines to the post's saved pose.
     public var isDirty: Bool {
         if photos.isNotEmpty { return true }
+        // Place tags are create-only: the edit pipeline (buildUpdateRequest)
+        // has no location fields, so a tag must not enable a no-op Save.
+        if !isEditing, selectedPlaceTag != nil { return true }
         if identity != baselineIdentity { return true }
         if visibility != baselineVisibility { return true }
         for field in fieldsActiveForCurrentIntent() where fields[field]?.isDirty ?? false {
@@ -967,7 +985,24 @@ public final class PulseComposeViewModel {
         // lands with `ref_task_id` and renders a "View task" ref card.
         var request = mergeTargetContext(into: base)
         request.refTaskId = taskShare?.taskId
+        // LAST step — an explicitly tagged place overrides the flow
+        // target's location so the picked venue wins.
+        applyPlaceTag(to: &request)
         return request
+    }
+
+    /// Stamp the picked venue onto the outgoing request. GPS attestation
+    /// fields (`gpsTimestamp` / `gpsLatitude` / `gpsLongitude`) are left
+    /// untouched — they attest the device fix, not the tagged venue.
+    private func applyPlaceTag(to request: inout PostCreateRequest) {
+        guard let tag = selectedPlaceTag else { return }
+        request.latitude = tag.latitude
+        request.longitude = tag.longitude
+        request.locationName = tag.name
+        request.locationAddress = tag.address
+        request.geocodeProvider = "mapbox"
+        request.geocodeAccuracy = tag.kind
+        request.geocodePlaceId = tag.placeId
     }
 
     private func isoTimestamp(from date: Date) -> String {
@@ -1014,6 +1049,10 @@ public final class PulseComposeViewModel {
             latitude: target.latitude,
             longitude: target.longitude,
             locationName: target.isPlaceTarget ? target.displayLabel : nil,
+            locationAddress: base.locationAddress,
+            geocodeProvider: base.geocodeProvider,
+            geocodeAccuracy: base.geocodeAccuracy,
+            geocodePlaceId: base.geocodePlaceId,
             homeId: target.homeId,
             businessId: target.businessId,
             tags: base.tags,

@@ -63,6 +63,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.audience_profile.tierColor
+import app.pantopus.android.ui.screens.compose.placepicker.PlacePickerSheet
+import app.pantopus.android.ui.screens.compose.placepicker.PostPlaceTag
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -123,11 +125,18 @@ fun ComposeBroadcastScreen(
             }
         }
 
+    // The place-picker sheet lives on the screen (not the scaffold) for the
+    // same reason as the photo picker: it hosts a runtime-permission
+    // launcher + Hilt view-model, which Paparazzi can't provide.
+    var showPlacePicker by remember { mutableStateOf(false) }
+
     ComposeBroadcastScaffold(
         uiState = uiState,
         onClose = onClose,
         onBodyChange = viewModel::updateBody,
         onAudienceSelected = viewModel::setAudience,
+        onAddLocation = { showPlacePicker = true },
+        onClearLocation = viewModel::clearPlaceTag,
         onLaunchPhotoPicker = {
             if (remainingSlots > 0) {
                 photoPicker.launch(
@@ -145,6 +154,21 @@ fun ComposeBroadcastScreen(
         recentsError = recentsError,
         onRetryRecents = viewModel::load,
     )
+
+    if (showPlacePicker) {
+        PlacePickerSheet(
+            currentTag = uiState.draft.placeTag,
+            onSelect = { tag ->
+                viewModel.selectPlaceTag(tag)
+                showPlacePicker = false
+            },
+            onRemove = {
+                viewModel.clearPlaceTag()
+                showPlacePicker = false
+            },
+            onDismiss = { showPlacePicker = false },
+        )
+    }
 }
 
 @Suppress("LongParameterList")
@@ -154,6 +178,8 @@ internal fun ComposeBroadcastScaffold(
     onClose: () -> Unit = {},
     onBodyChange: (String) -> Unit = {},
     onAudienceSelected: (BroadcastAudience) -> Unit = {},
+    onAddLocation: () -> Unit = {},
+    onClearLocation: () -> Unit = {},
     onLaunchPhotoPicker: () -> Unit = {},
     onRemoveMedia: (String) -> Unit = {},
     onScheduleConfirm: (Long) -> Unit = {},
@@ -199,6 +225,11 @@ internal fun ComposeBroadcastScaffold(
                         onLaunchPhotoPicker = onLaunchPhotoPicker,
                         onRemoveMedia = onRemoveMedia,
                         onAudienceClick = { showAudienceSheet = true },
+                    )
+                    LocationRow(
+                        placeTag = uiState.draft.placeTag,
+                        onClick = onAddLocation,
+                        onClear = onClearLocation,
                     )
                     ScheduleRow(scheduledLabel = uiState.scheduledLabel, onClick = { showScheduleSheet = true })
                     RecentSection(
@@ -726,6 +757,94 @@ private fun ScheduleRow(
             strokeWidth = 2f,
             tint = PantopusColors.appTextMuted,
         )
+    }
+}
+
+/**
+ * Instagram-style place tag — mirrors the Pulse composer's location row
+ * (iOS ids `composeBroadcastAddLocationRow` / `…ClearLocationButton`).
+ * The row opens the shared PlacePickerSheet; a set tag renders name +
+ * address with a ✕ clear button.
+ */
+@Composable
+private fun LocationRow(
+    placeTag: PostPlaceTag?,
+    onClick: () -> Unit,
+    onClear: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .clickable(onClick = onClick)
+                .padding(Spacing.s3)
+                .testTag("composeBroadcastAddLocationRow"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(if (placeTag == null) PantopusColors.appSurfaceSunken else PantopusColors.primary50),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.MapPin,
+                contentDescription = null,
+                size = 15.dp,
+                strokeWidth = 2f,
+                tint = if (placeTag == null) PantopusColors.appTextStrong else PantopusColors.primary600,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = placeTag?.name ?: "Add location",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text =
+                    placeTag?.address?.takeIf { it.isNotBlank() }
+                        ?: if (placeTag == null) "Tag a place, like Instagram" else "Tap to change",
+                fontSize = 11.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        if (placeTag == null) {
+            PantopusIconImage(
+                icon = PantopusIcon.ChevronRight,
+                contentDescription = null,
+                size = 14.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.appTextMuted,
+            )
+        } else {
+            Box(
+                modifier =
+                    Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.appSurfaceSunken)
+                        .clickable(onClick = onClear)
+                        .testTag("composeBroadcastClearLocationButton")
+                        .semantics { contentDescription = "Remove location" },
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.X,
+                    contentDescription = null,
+                    size = 14.dp,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.appTextSecondary,
+                )
+            }
+        }
     }
 }
 

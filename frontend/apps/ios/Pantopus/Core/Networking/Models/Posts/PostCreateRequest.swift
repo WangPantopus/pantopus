@@ -20,9 +20,20 @@ public struct PostCreateRequest: Encodable, Sendable, Hashable {
     public let visibility: String
     public let postAs: String
     public let mediaUrls: [String]?
-    public let latitude: Double?
-    public let longitude: Double?
-    public let locationName: String?
+    /// Location block — `var` (like `refTaskId`) so the compose pipeline
+    /// can apply an explicit place tag AFTER `mergeTargetContext` has
+    /// full-copied the request.
+    public var latitude: Double?
+    public var longitude: Double?
+    public var locationName: String?
+    /// Short address line of an explicitly tagged place.
+    public var locationAddress: String?
+    /// Geocode provenance for an explicit place tag — always `"mapbox"`.
+    public var geocodeProvider: String?
+    /// Provider feature kind (`poi` / `place` / …) of the tagged place.
+    public var geocodeAccuracy: String?
+    /// Mapbox feature id (e.g. `poi.123`) of the tagged place.
+    public var geocodePlaceId: String?
     public let homeId: String?
     public let businessId: String?
     public let tags: [String]?
@@ -70,6 +81,10 @@ public struct PostCreateRequest: Encodable, Sendable, Hashable {
         latitude: Double? = nil,
         longitude: Double? = nil,
         locationName: String? = nil,
+        locationAddress: String? = nil,
+        geocodeProvider: String? = nil,
+        geocodeAccuracy: String? = nil,
+        geocodePlaceId: String? = nil,
         homeId: String? = nil,
         businessId: String? = nil,
         tags: [String]? = nil,
@@ -103,6 +118,10 @@ public struct PostCreateRequest: Encodable, Sendable, Hashable {
         self.latitude = latitude
         self.longitude = longitude
         self.locationName = locationName
+        self.locationAddress = locationAddress
+        self.geocodeProvider = geocodeProvider
+        self.geocodeAccuracy = geocodeAccuracy
+        self.geocodePlaceId = geocodePlaceId
         self.homeId = homeId
         self.businessId = businessId
         self.tags = tags
@@ -131,7 +150,8 @@ public struct PostCreateRequest: Encodable, Sendable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case content, title, postType, visibility, postAs, mediaUrls
         case latitude, longitude
-        case locationName
+        case locationName, locationAddress
+        case geocodeProvider, geocodeAccuracy, geocodePlaceId
         case homeId, businessId
         case tags
         case gpsTimestamp, gpsLatitude, gpsLongitude
@@ -157,6 +177,10 @@ public struct PostCreateRequest: Encodable, Sendable, Hashable {
         try container.encodeIfPresent(latitude, forKey: .latitude)
         try container.encodeIfPresent(longitude, forKey: .longitude)
         try container.encodeIfPresent(locationName, forKey: .locationName)
+        try container.encodeIfPresent(locationAddress, forKey: .locationAddress)
+        try container.encodeIfPresent(geocodeProvider, forKey: .geocodeProvider)
+        try container.encodeIfPresent(geocodeAccuracy, forKey: .geocodeAccuracy)
+        try container.encodeIfPresent(geocodePlaceId, forKey: .geocodePlaceId)
         try container.encodeIfPresent(homeId, forKey: .homeId)
         try container.encodeIfPresent(businessId, forKey: .businessId)
         try container.encodeIfPresent(tags, forKey: .tags)

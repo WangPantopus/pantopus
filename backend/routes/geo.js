@@ -248,4 +248,154 @@ router.get('/reverse', async (req, res) => {
   }
 });
 
+// ── GET /geo/places/nearby?lat=..&lng=.. ─────────────────────
+// Named places (POIs) + locality around a point for the place-tag picker.
+
+router.get('/places/nearby', async (req, res) => {
+  const startTime = process.hrtime.bigint();
+  const ipHash = hashIp(req);
+  const rawLng = req.query.lng ?? req.query.lon; // accept `lon` alias
+
+  logger.info('geo_request', {
+    endpoint: '/geo/places/nearby',
+    method: 'GET',
+    query_redacted: `lat=${redactQuery(req.query.lat)}&lng=${redactQuery(rawLng)}`,
+    ip_hash: ipHash,
+  });
+
+  try {
+    const lat = parseFloat(req.query.lat);
+    const lng = parseFloat(rawLng);
+
+    // Range-check too: out-of-range coords would burn two billable Mapbox
+    // calls per request (this endpoint is unauthenticated) only to surface
+    // an upstream 422 as a 500.
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)
+      || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      logResponse(startTime, {
+        endpoint: '/geo/places/nearby',
+        status: 400,
+        result_count: 0,
+        provider: 'none',
+        cache_hit: false,
+      });
+      return res.status(400).json({ error: 'lat and lng are required numbers' });
+    }
+
+    // Check cache — round to 4 decimal places (~11m precision)
+    const cacheKey = 'pn:' + lat.toFixed(4) + ':' + lng.toFixed(4);
+    const cached = geoCache.get(cacheKey);
+    if (cached) {
+      logResponse(startTime, {
+        endpoint: '/geo/places/nearby',
+        status: 200,
+        result_count: cached.places.length,
+        provider: providerLabel,
+        cache_hit: true,
+      });
+      return res.json(cached);
+    }
+
+    const result = await geoProvider.nearbyPlaces(lat, lng, { limit: 10 });
+    const responseBody = { places: result.places, locality: result.locality ?? null };
+    geoCache.set(cacheKey, responseBody, 120_000); // 120s TTL
+
+    logResponse(startTime, {
+      endpoint: '/geo/places/nearby',
+      status: 200,
+      result_count: responseBody.places.length,
+      provider: providerLabel,
+      cache_hit: false,
+    });
+
+    res.json(responseBody);
+  } catch (e) {
+    logResponse(startTime, {
+      endpoint: '/geo/places/nearby',
+      status: 500,
+      result_count: 0,
+      provider: providerLabel,
+      cache_hit: false,
+    });
+    res.status(500).json({ error: e.message || 'Server error' });
+  }
+});
+
+// ── GET /geo/places/search?q=..&lat=..&lng=.. ────────────────
+// Place-tag picker search; lat/lng are optional proximity hints.
+
+router.get('/places/search', async (req, res) => {
+  const startTime = process.hrtime.bigint();
+  const ipHash = hashIp(req);
+  const q = (req.query.q || '').toString().trim();
+
+  logger.info('geo_request', {
+    endpoint: '/geo/places/search',
+    method: 'GET',
+    query_redacted: redactQuery(q),
+    ip_hash: ipHash,
+  });
+
+  try {
+    if (q.length < 2) {
+      logResponse(startTime, {
+        endpoint: '/geo/places/search',
+        status: 200,
+        result_count: 0,
+        provider: 'none',
+        cache_hit: false,
+      });
+      return res.json({ places: [] });
+    }
+
+    const lat = parseFloat(req.query.lat);
+    const lng = parseFloat(req.query.lng ?? req.query.lon); // accept `lon` alias
+    // Proximity is an optional hint — silently drop out-of-range coords
+    // instead of forwarding them to Mapbox (which would 4xx the search).
+    const hasProximity = Number.isFinite(lat) && Number.isFinite(lng)
+      && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+
+    const cacheKey = 'ps:' + q.toLowerCase()
+      + ':' + (hasProximity ? lat.toFixed(4) : '_')
+      + ':' + (hasProximity ? lng.toFixed(4) : '_');
+    const cached = geoCache.get(cacheKey);
+    if (cached) {
+      logResponse(startTime, {
+        endpoint: '/geo/places/search',
+        status: 200,
+        result_count: cached.places.length,
+        provider: providerLabel,
+        cache_hit: true,
+      });
+      return res.json(cached);
+    }
+
+    const result = await geoProvider.searchPlaces(
+      q,
+      hasProximity ? { lat, lng, limit: 8 } : { limit: 8 },
+    );
+    const responseBody = { places: result.places };
+    geoCache.set(cacheKey, responseBody, 60_000); // 60s TTL
+
+    logResponse(startTime, {
+      endpoint: '/geo/places/search',
+      status: 200,
+      result_count: responseBody.places.length,
+      provider: providerLabel,
+      cache_hit: false,
+    });
+
+    res.json(responseBody);
+  } catch (e) {
+    logResponse(startTime, {
+      endpoint: '/geo/places/search',
+      status: 500,
+      result_count: 0,
+      provider: providerLabel,
+      cache_hit: false,
+    });
+    res.status(500).json({ error: e.message || 'Server error' });
+  }
+});
+
 module.exports = router;

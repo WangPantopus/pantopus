@@ -14,6 +14,7 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.audience.AudienceProfileRepository
 import app.pantopus.android.data.upload.UploadFile
 import app.pantopus.android.data.upload.UploadRepository
+import app.pantopus.android.ui.screens.compose.placepicker.PostPlaceTag
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -158,12 +159,21 @@ class ComposeBroadcastViewModel
             if (draft.body.isBlank() && hosted.isEmpty()) {
                 error("Add a message to go with your media.")
             }
+            // An explicitly picked venue is intentional public disclosure
+            // (Instagram-style); auto GPS/home context is never attached to
+            // a Beacon post — the backend strips identity-linking fields.
+            val tag = draft.placeTag
             val body =
                 PublishUpdateBody(
                     body = draft.body.trim(),
                     visibility = visibility,
                     targetTierRank = rank,
                     media = hosted.ifEmpty { null },
+                    latitude = tag?.latitude,
+                    longitude = tag?.longitude,
+                    locationName = tag?.name,
+                    locationAddress = tag?.address,
+                    placeId = tag?.placeId,
                 )
             val messageId =
                 when (val result = repository.publishUpdate(channel, body)) {
@@ -196,6 +206,11 @@ class ComposeBroadcastViewModel
         }
 
         fun removeMedia(id: String) = mutateDraft { draft -> draft.copy(media = draft.media.filterNot { it.id == id }) }
+
+        /** Instagram-style venue tag picked in the shared PlacePickerSheet. */
+        fun selectPlaceTag(tag: PostPlaceTag) = mutateDraft { it.copy(placeTag = tag) }
+
+        fun clearPlaceTag() = mutateDraft { it.copy(placeTag = null) }
 
         /** Clear every attachment. */
         fun removeMedia() = mutateDraft { it.copy(media = emptyList()) }

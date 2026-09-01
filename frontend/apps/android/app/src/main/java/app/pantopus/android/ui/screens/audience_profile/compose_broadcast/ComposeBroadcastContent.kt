@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.audience_profile.compose_broadcast
 
 import androidx.compose.runtime.Immutable
+import app.pantopus.android.ui.screens.compose.placepicker.PostPlaceTag
 import app.pantopus.android.ui.screens.identity_center.IdentityKind
 import app.pantopus.android.ui.theme.PantopusIcon
 
@@ -101,6 +102,8 @@ data class ComposeBroadcastDraft(
     val body: String = "",
     val audience: BroadcastAudience = BroadcastAudience.AllBeacons,
     val media: List<ComposeMediaPreview> = emptyList(),
+    /** Instagram-style venue tag riding the publish body's location keys. */
+    val placeTag: PostPlaceTag? = null,
 ) {
     /** Nothing worth sending — empty body and no media. */
     val isEmpty: Boolean get() = body.isBlank() && media.isEmpty()

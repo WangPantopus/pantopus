@@ -22,6 +22,7 @@ import app.pantopus.android.data.posts.PostPrecheckRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import app.pantopus.android.data.upload.UploadRepository
+import app.pantopus.android.ui.screens.compose.placepicker.PostPlaceTag
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -145,6 +146,23 @@ class PulseComposeViewModelTest {
         val vm = viewModel(PulseComposeIntent.Ask)
         vm.appendPhoto(PulseComposePhoto(id = "p1", data = byteArrayOf(0xFF.toByte())))
         assertTrue(vm.isDirty)
+    }
+
+    @Test fun placeTagMarksDirty() {
+        val vm = viewModel(PulseComposeIntent.Ask)
+        assertFalse(vm.isDirty)
+        vm.selectPlaceTag(placeTag())
+        assertTrue(vm.isDirty)
+        vm.clearPlaceTag()
+        assertFalse(vm.isDirty)
+    }
+
+    @Test fun placeTagDoesNotDirtyEditMode() {
+        // Place tags are create-only: buildUpdateRequest carries no
+        // location fields, so a tag must never enable a no-op Save.
+        val vm = editViewModel()
+        vm.selectPlaceTag(placeTag())
+        assertFalse(vm.isDirty)
     }
 
     // MARK: - Valid
@@ -294,6 +312,72 @@ class PulseComposeViewModelTest {
         assertEquals("nearby", request.audience)
         assertEquals("followers", request.visibility)
     }
+
+    // MARK: - Place tag
+
+    @Test fun placeTagLandsOnRequest() {
+        val vm = viewModel(PulseComposeIntent.Ask)
+        vm.update(PulseComposeField.Title, "Coffee meetup?")
+        vm.update(PulseComposeField.Body, "Anyone around?")
+        vm.selectPlaceTag(placeTag())
+        val request = vm.buildRequest()
+        assertEquals(45.52, request.latitude!!, 0.0)
+        assertEquals(-122.68, request.longitude!!, 0.0)
+        assertEquals("Blue Bottle", request.locationName)
+        assertEquals("123 Main St", request.locationAddress)
+        assertEquals("mapbox", request.geocodeProvider)
+        assertEquals("poi", request.geocodeAccuracy)
+        assertEquals("poi.123", request.geocodePlaceId)
+    }
+
+    @Test fun placeTagOverridesFlowTargetLocationButNotGps() {
+        coEvery { repo.placeEligibility(any(), any(), any(), any(), any()) } returns
+            NetworkResult.Success(PlaceEligibilityResponse(eligible = true))
+        val vm = viewModel(PulseComposeIntent.Ask)
+        vm.applyFlowContext(
+            target = PulsePostingTarget.CurrentLocation(45.5, -122.4, "Camas, WA"),
+            purpose = null,
+        )
+        vm.update(PulseComposeField.Title, "Hello")
+        vm.update(PulseComposeField.Body, "What's up")
+        vm.selectPlaceTag(placeTag())
+        val request = vm.buildRequest()
+        // The explicit pick wins over the flow-target context (the tag is
+        // applied AFTER mergeTargetContext).
+        assertEquals(45.52, request.latitude!!, 0.0)
+        assertEquals(-122.68, request.longitude!!, 0.0)
+        assertEquals("Blue Bottle", request.locationName)
+        assertEquals("poi.123", request.geocodePlaceId)
+        // GPS attestation still carries the device/target fix, not the venue.
+        assertEquals(45.5, request.gpsLatitude!!, 0.0)
+        assertEquals(-122.4, request.gpsLongitude!!, 0.0)
+    }
+
+    @Test fun clearPlaceTagRemovesFields() {
+        val vm = viewModel(PulseComposeIntent.Ask)
+        vm.update(PulseComposeField.Title, "Coffee meetup?")
+        vm.update(PulseComposeField.Body, "Anyone around?")
+        vm.selectPlaceTag(placeTag())
+        vm.clearPlaceTag()
+        val request = vm.buildRequest()
+        assertNull(request.latitude)
+        assertNull(request.longitude)
+        assertNull(request.locationName)
+        assertNull(request.locationAddress)
+        assertNull(request.geocodeProvider)
+        assertNull(request.geocodeAccuracy)
+        assertNull(request.geocodePlaceId)
+    }
+
+    private fun placeTag(): PostPlaceTag =
+        PostPlaceTag(
+            name = "Blue Bottle",
+            address = "123 Main St",
+            latitude = 45.52,
+            longitude = -122.68,
+            placeId = "poi.123",
+            kind = "poi",
+        )
 
     @Test fun headsUpRequestCarriesSafetyAlertKind() {
         coEvery { repo.placeEligibility(any(), any(), any(), any(), any()) } returns

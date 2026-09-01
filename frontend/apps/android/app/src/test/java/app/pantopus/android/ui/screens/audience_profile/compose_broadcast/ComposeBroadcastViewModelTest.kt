@@ -3,9 +3,21 @@
 package app.pantopus.android.ui.screens.audience_profile.compose_broadcast
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.api.models.audience.BroadcastChannelDto
+import app.pantopus.android.data.api.models.audience.BroadcastHistoryResponse
+import app.pantopus.android.data.api.models.audience.BroadcastMessageDto
+import app.pantopus.android.data.api.models.audience.MembershipStatsResponse
+import app.pantopus.android.data.api.models.audience.PersonaMeResponse
+import app.pantopus.android.data.api.models.audience.PersonaSummaryDto
+import app.pantopus.android.data.api.models.audience.PublishUpdateBody
+import app.pantopus.android.data.api.models.audience.PublishUpdateResponse
+import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.audience.AudienceProfileRepository
 import app.pantopus.android.data.upload.UploadRepository
+import app.pantopus.android.ui.screens.compose.placepicker.PostPlaceTag
+import io.mockk.coEvery
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -242,6 +254,83 @@ class ComposeBroadcastViewModelTest {
             assertTrue(it.replies.isNotEmpty())
         }
     }
+
+    // MARK: - Place tag
+
+    @Test
+    fun `select and clear place tag mutate the draft`() {
+        val vm = buildVm()
+        vm.selectPlaceTag(placeTag())
+        assertEquals(placeTag(), vm.state.value.draft.placeTag)
+        vm.clearPlaceTag()
+        assertNull(vm.state.value.draft.placeTag)
+    }
+
+    @Test
+    fun `publish threads the place tag onto the wire body`() =
+        runTest(dispatcher) {
+            val body = slot<PublishUpdateBody>()
+            stubPublishLegs(body)
+            val vm = buildVm()
+            vm.load()
+            advanceUntilIdle()
+            vm.updateBody("Pop-up tonight!")
+            vm.selectPlaceTag(placeTag())
+            vm.send()
+            advanceUntilIdle()
+            assertEquals(45.52, body.captured.latitude!!, 0.0)
+            assertEquals(-122.68, body.captured.longitude!!, 0.0)
+            assertEquals("Blue Bottle", body.captured.locationName)
+            assertEquals("123 Main St", body.captured.locationAddress)
+            assertEquals("poi.123", body.captured.placeId)
+            // Send resets the draft — the tag can't leak onto the next one.
+            assertNull(vm.state.value.draft.placeTag)
+        }
+
+    @Test
+    fun `publish without a place tag keeps the location keys off the wire`() =
+        runTest(dispatcher) {
+            val body = slot<PublishUpdateBody>()
+            stubPublishLegs(body)
+            val vm = buildVm()
+            vm.load()
+            advanceUntilIdle()
+            vm.updateBody("No venue this time.")
+            vm.send()
+            advanceUntilIdle()
+            assertNull(body.captured.latitude)
+            assertNull(body.captured.longitude)
+            assertNull(body.captured.locationName)
+            assertNull(body.captured.locationAddress)
+            assertNull(body.captured.placeId)
+        }
+
+    /** Wire up the four legs `load()` + `realPublish` touch. */
+    private fun stubPublishLegs(body: io.mockk.CapturingSlot<PublishUpdateBody>) {
+        coEvery { repository.me() } returns
+            NetworkResult.Success(
+                PersonaMeResponse(
+                    persona = PersonaSummaryDto(id = "p1", handle = "chef"),
+                    channel = BroadcastChannelDto(id = "ch1"),
+                ),
+            )
+        coEvery { repository.membershipStats("p1") } returns
+            NetworkResult.Success(MembershipStatsResponse())
+        coEvery { repository.broadcastHistory("ch1") } returns
+            NetworkResult.Success(BroadcastHistoryResponse())
+        coEvery { repository.publishUpdate("ch1", capture(body)) } returns
+            NetworkResult.Success(PublishUpdateResponse(message = BroadcastMessageDto(id = "m1")))
+    }
+
+    private fun placeTag(): PostPlaceTag =
+        PostPlaceTag(
+            name = "Blue Bottle",
+            address = "123 Main St",
+            latitude = 45.52,
+            longitude = -122.68,
+            placeId = "poi.123",
+            kind = "poi",
+        )
 }
 
 private class SendFailure(message: String) : RuntimeException(message)

@@ -105,6 +105,65 @@ final class ComposeBroadcastViewModelTests: XCTestCase {
         XCTAssertEqual(vm.reach(for: .bronzePlus), 518)
     }
 
+    // MARK: - Place tag
+
+    private static let placeTag = PostPlaceTag(
+        name: "Joe's Coffee",
+        address: "123 Elm St",
+        latitude: 45.521,
+        longitude: -122.681,
+        placeId: "poi.1",
+        kind: "poi"
+    )
+
+    func testSelectPlaceTagStoredAndClearedAfterSend() async {
+        let vm = makeVM()
+        vm.selectPlaceTag(Self.placeTag)
+        XCTAssertEqual(vm.selectedPlaceTag?.name, "Joe's Coffee")
+        vm.updateBody("Fresh loaves at the stand today")
+        await vm.send()
+        XCTAssertNil(vm.selectedPlaceTag, "tag resets with the draft after a successful send")
+    }
+
+    func testClearPlaceTagRemovesSelection() {
+        let vm = makeVM()
+        vm.selectPlaceTag(Self.placeTag)
+        vm.clearPlaceTag()
+        XCTAssertNil(vm.selectedPlaceTag)
+    }
+
+    /// Wire contract for B5 — snake_case keys, nils dropped (the
+    /// broadcast schema is a CLOSED Joi object that rejects `null`s).
+    func testPublishBodyEncodesPlaceTagSnakeCaseAndDropsNils() throws {
+        let tagged = PublishUpdateBody(
+            body: "Fresh loaves",
+            visibility: "public",
+            latitude: 45.521,
+            longitude: -122.681,
+            locationName: "Joe's Coffee",
+            locationAddress: "123 Elm St",
+            placeId: "poi.1"
+        )
+        let json = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(tagged)
+        ) as? [String: Any]
+        XCTAssertEqual(json?["location_name"] as? String, "Joe's Coffee")
+        XCTAssertEqual(json?["location_address"] as? String, "123 Elm St")
+        XCTAssertEqual(json?["place_id"] as? String, "poi.1")
+        XCTAssertEqual(json?["latitude"] as? Double ?? 0, 45.521, accuracy: 0.0001)
+        XCTAssertEqual(json?["longitude"] as? Double ?? 0, -122.681, accuracy: 0.0001)
+
+        let untagged = PublishUpdateBody(body: "Fresh loaves", visibility: "public")
+        let bare = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(untagged)
+        ) as? [String: Any]
+        XCTAssertNil(bare?["location_name"])
+        XCTAssertNil(bare?["location_address"])
+        XCTAssertNil(bare?["place_id"])
+        XCTAssertNil(bare?["latitude"])
+        XCTAssertNil(bare?["longitude"])
+    }
+
     func testScheduleAndSendNowToggleState() {
         let vm = makeVM()
         vm.updateBody("Loaf drop at 4")

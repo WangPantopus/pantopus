@@ -1352,26 +1352,37 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
     }
 
     if (postAs === 'persona') {
+      // An explicitly picked venue (geocodePlaceId present) is intentional
+      // public disclosure, like an Instagram place tag — keep it. But
+      // auto-attached GPS/home context is ALWAYS stripped so a Beacon post
+      // can never leak the author's home or live GPS fix.
+      const hasExplicitPlaceTag = !!(geocodePlaceId && effectiveLocationName
+        && effectiveLatitude != null && effectiveLongitude != null);
+      // Identity-linking fields are ALWAYS stripped for Beacon posts.
       Object.assign(postData, {
         home_id: null,
-        latitude: null,
-        longitude: null,
-        effective_latitude: null,
-        effective_longitude: null,
-        location_name: null,
-        location_address: null,
         target_place_id: null,
         radius_miles: null,
         gps_timestamp: null,
         gps_latitude: null,
         gps_longitude: null,
-        geocode_provider: null,
-        geocode_mode: null,
-        geocode_accuracy: null,
-        geocode_place_id: null,
-        geocode_source_flow: null,
-        geocode_created_at: null,
       });
+      if (!hasExplicitPlaceTag) {
+        Object.assign(postData, {
+          latitude: null,
+          longitude: null,
+          effective_latitude: null,
+          effective_longitude: null,
+          location_name: null,
+          location_address: null,
+          geocode_provider: null,
+          geocode_mode: null,
+          geocode_accuracy: null,
+          geocode_place_id: null,
+          geocode_source_flow: null,
+          geocode_created_at: null,
+        });
+      }
     }
 
     // Compute initial utility_score so the post ranks properly before the background job runs

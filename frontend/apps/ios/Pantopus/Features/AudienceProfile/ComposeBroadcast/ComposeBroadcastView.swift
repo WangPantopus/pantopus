@@ -19,6 +19,7 @@ public struct ComposeBroadcastView: View {
     @State private var viewModel: ComposeBroadcastViewModel
     @State private var showsAudienceSheet = false
     @State private var showsScheduleSheet = false
+    @State private var showsPlacePicker = false
     @State private var showsPhotosPicker = false
     @State private var photoSelections: [PhotosPickerItem] = []
     @State private var scheduleDraftDate = Date()
@@ -54,6 +55,22 @@ public struct ComposeBroadcastView: View {
         }
         .sheet(isPresented: $showsAudienceSheet) { audienceSheet }
         .sheet(isPresented: $showsScheduleSheet) { scheduleSheet }
+        .sheet(isPresented: $showsPlacePicker) {
+            PlacePickerSheet(
+                currentTag: viewModel.selectedPlaceTag,
+                onSelect: { tag in
+                    viewModel.selectPlaceTag(tag)
+                    showsPlacePicker = false
+                },
+                onRemove: {
+                    viewModel.clearPlaceTag()
+                    showsPlacePicker = false
+                },
+                onDismiss: { showsPlacePicker = false }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .accessibilityIdentifier("composeBroadcast")
     }
 
@@ -125,6 +142,7 @@ public struct ComposeBroadcastView: View {
                     errorBanner(message)
                 }
                 editor
+                locationRow
                 scheduleRow
                 recentBroadcastsSection
             }
@@ -156,6 +174,81 @@ public struct ComposeBroadcastView: View {
             onRemoveMedia: { id in viewModel.removeMedia(id: id) },
             onChangeAudience: { showsAudienceSheet = true }
         )
+    }
+
+    // MARK: - Location row
+
+    /// Instagram-style place tag — same shared picker as the Pulse
+    /// composer. Row re-opens the picker; the trailing ✕ clears the tag.
+    private var locationRow: some View {
+        HStack(spacing: Spacing.s0) {
+            Button { showsPlacePicker = true } label: {
+                HStack(spacing: Spacing.s3) {
+                    Icon(
+                        .mapPin,
+                        size: 15,
+                        color: viewModel.selectedPlaceTag == nil
+                            ? Theme.Color.appTextStrong
+                            : Theme.Color.primary600
+                    )
+                    .frame(width: 30, height: 30)
+                    .background(
+                        viewModel.selectedPlaceTag == nil
+                            ? Theme.Color.appSurfaceSunken
+                            : Theme.Color.primary50
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(viewModel.selectedPlaceTag?.name ?? "Add location")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appText)
+                            .lineLimit(1)
+                        Text(locationSubtitle)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: Spacing.s0)
+                    if viewModel.selectedPlaceTag == nil {
+                        Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                viewModel.selectedPlaceTag.map { "Change location, \($0.name)" } ?? "Add location"
+            )
+            .accessibilityIdentifier("composeBroadcastAddLocationRow")
+
+            if viewModel.selectedPlaceTag != nil {
+                Button { viewModel.clearPlaceTag() } label: {
+                    Icon(.x, size: 16, color: Theme.Color.appTextSecondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove location")
+                .accessibilityIdentifier("composeBroadcastClearLocationButton")
+            }
+        }
+        .padding(.vertical, Spacing.s3)
+        .padding(.leading, Spacing.s3)
+        .padding(.trailing, viewModel.selectedPlaceTag == nil ? Spacing.s3 : Spacing.s0)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+
+    private var locationSubtitle: String {
+        guard let tag = viewModel.selectedPlaceTag else {
+            return "Tag a place on this update"
+        }
+        return tag.address ?? "Tagged place"
     }
 
     // MARK: - Schedule row

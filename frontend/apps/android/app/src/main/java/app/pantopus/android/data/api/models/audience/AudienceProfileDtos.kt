@@ -231,6 +231,14 @@ data class PublishUpdateBody(
     val visibility: String,
     @Json(name = "target_tier_rank") val targetTierRank: Int? = null,
     val media: List<BroadcastMediaPayload>? = null,
+    // Instagram-style place tag — an explicitly picked venue is intentional
+    // public disclosure; auto GPS/home context never rides a Beacon post.
+    // Keys mirror `createBroadcastMessageSchema` (snake_case) exactly.
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @Json(name = "location_name") val locationName: String? = null,
+    @Json(name = "location_address") val locationAddress: String? = null,
+    @Json(name = "place_id") val placeId: String? = null,
 )
 
 /**

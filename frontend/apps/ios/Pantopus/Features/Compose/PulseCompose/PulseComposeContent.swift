@@ -35,6 +35,8 @@ public struct PulseComposeContentState: Equatable {
     public var isVisitorPost: Bool
     public var fields: [PulseComposeField: FormFieldState]
     public var photos: [PulseComposePhoto]
+    /// Explicitly tagged place — renders the filled location row.
+    public var selectedPlaceTag: PostPlaceTag?
     /// True when the intent picker should render as a non-interactive
     /// chip row (edit mode — `post_type` is fixed at create time).
     public var isIntentLocked: Bool
@@ -60,6 +62,7 @@ public struct PulseComposeContentState: Equatable {
         isVisitorPost: Bool = false,
         fields: [PulseComposeField: FormFieldState] = [:],
         photos: [PulseComposePhoto] = [],
+        selectedPlaceTag: PostPlaceTag? = nil,
         isIntentLocked: Bool = false,
         isFlowMode: Bool = false,
         composePurpose: PulseComposePurpose? = nil,
@@ -81,6 +84,7 @@ public struct PulseComposeContentState: Equatable {
         self.isVisitorPost = isVisitorPost
         self.fields = fields
         self.photos = photos
+        self.selectedPlaceTag = selectedPlaceTag
         self.isIntentLocked = isIntentLocked
         self.isFlowMode = isFlowMode
         self.composePurpose = composePurpose
@@ -107,6 +111,10 @@ public struct PulseComposeContentActions {
     public var onBodyEditingEnded: () -> Void
     /// X on the precheck nudge banner.
     public var onDismissPrecheckNudge: () -> Void
+    /// "Add location" row (also re-opens the picker when a tag is set).
+    public var onAddLocation: () -> Void
+    /// ✕ on the filled location row.
+    public var onClearLocation: () -> Void
 
     public init(
         onSelectIntent: @escaping (PulseComposeIntent) -> Void = { _ in },
@@ -123,7 +131,9 @@ public struct PulseComposeContentActions {
         onPickPhotos: @escaping () -> Void = {},
         onRemovePhoto: @escaping (UUID) -> Void = { _ in },
         onBodyEditingEnded: @escaping () -> Void = {},
-        onDismissPrecheckNudge: @escaping () -> Void = {}
+        onDismissPrecheckNudge: @escaping () -> Void = {},
+        onAddLocation: @escaping () -> Void = {},
+        onClearLocation: @escaping () -> Void = {}
     ) {
         self.onSelectIntent = onSelectIntent
         self.onSelectIdentity = onSelectIdentity
@@ -140,6 +150,8 @@ public struct PulseComposeContentActions {
         self.onRemovePhoto = onRemovePhoto
         self.onBodyEditingEnded = onBodyEditingEnded
         self.onDismissPrecheckNudge = onDismissPrecheckNudge
+        self.onAddLocation = onAddLocation
+        self.onClearLocation = onClearLocation
     }
 }
 
@@ -170,6 +182,12 @@ public struct PulseComposeContent: View {
             precheckBanners
             intentSpecificSection
             photosSection
+            // Place tags are create-only (PostUpdateRequest carries no
+            // location fields), so hide the row in edit mode — offering a
+            // picker whose input the Save path drops would lose data.
+            if !state.isIntentLocked {
+                locationSection
+            }
             if !state.isFlowMode || state.visibility != .connections {
                 visibilitySection
             }
@@ -847,6 +865,73 @@ public struct PulseComposeContent: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Add photo")
         .accessibilityIdentifier("composePulseAddPhoto")
+    }
+
+    // MARK: - Location
+
+    /// Instagram-style place tag — `PlacePickerSheet` feeds the tag.
+    private var locationSection: some View {
+        FormFieldGroup("Location (optional)") {
+            if let tag = state.selectedPlaceTag {
+                selectedLocationRow(tag)
+            } else {
+                addLocationRow
+            }
+        }
+    }
+
+    private var addLocationRow: some View {
+        Button(action: actions.onAddLocation) {
+            HStack(spacing: Spacing.s2) {
+                Icon(.mapPin, size: 16, strokeWidth: 2, color: Theme.Color.appTextSecondary)
+                Text("Add location")
+                    .pantopusTextStyle(.body)
+                    .foregroundStyle(Theme.Color.appText)
+                Spacer(minLength: Spacing.s2)
+                Icon(.chevronRight, size: 14, strokeWidth: 2, color: Theme.Color.appTextMuted)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add location")
+        .accessibilityIdentifier("composePulseAddLocationRow")
+    }
+
+    private func selectedLocationRow(_ tag: PostPlaceTag) -> some View {
+        HStack(spacing: Spacing.s2) {
+            // Row body re-opens the picker to swap the tag.
+            Button(action: actions.onAddLocation) {
+                HStack(spacing: Spacing.s2) {
+                    Icon(.mapPin, size: 16, strokeWidth: 2, color: Theme.Color.primary600)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(tag.name)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appText)
+                            .lineLimit(1)
+                        if let address = tag.address, !address.isEmpty {
+                            Text(address)
+                                .pantopusTextStyle(.caption)
+                                .foregroundStyle(Theme.Color.appTextSecondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer(minLength: Spacing.s2)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Change location, \(tag.name)")
+            .accessibilityIdentifier("composePulseAddLocationRow")
+            Button(action: actions.onClearLocation) {
+                Icon(.x, size: 16, strokeWidth: 2, color: Theme.Color.appTextSecondary)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove location")
+            .accessibilityIdentifier("composePulseClearLocationButton")
+        }
+        .frame(minHeight: 44)
     }
 
     // MARK: - Visibility

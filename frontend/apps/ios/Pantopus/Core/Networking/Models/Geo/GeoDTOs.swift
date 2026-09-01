@@ -96,3 +96,53 @@ public struct GeoResolveRequest: Encodable, Sendable, Hashable {
 public struct GeoResolveResponse: Decodable, Sendable, Hashable {
     public let normalized: NormalizedAddress
 }
+
+/// Coordinate on the place-tagging wire. Unlike the legacy autocomplete
+/// `center` (a GeoJSON `[lng, lat]` array), the `/api/geo/places/*`
+/// endpoints emit an object — do not confuse the two shapes.
+public struct GeoPlaceCenter: Decodable, Sendable, Hashable {
+    public let lat: Double
+    public let lng: Double
+}
+
+/// One named place (POI / locality) from `GET /api/geo/places/nearby`
+/// or `GET /api/geo/places/search` — the Instagram-style place-tag
+/// picker's row model.
+public struct GeoPlace: Decodable, Sendable, Hashable, Identifiable {
+    /// Mapbox feature id (e.g. `poi.123`). Nullable on the wire.
+    public let placeId: String?
+    public let name: String
+    /// e.g. "coffee shop, cafe" for POIs; nil for localities.
+    public let category: String?
+    /// Short address line ("123 Elm St").
+    public let address: String?
+    /// Full Mapbox `place_name` ("Joe's, 123 Elm St, Portland, OR…").
+    public let fullAddress: String?
+    public let center: GeoPlaceCenter
+    /// `poi` / `place` / `address` / … (provider `featureKind`).
+    public let kind: String
+    /// Metres from the query point; nil when no query coords were sent.
+    public let distanceM: Double?
+
+    public var id: String {
+        placeId ?? "\(name)|\(center.lat)|\(center.lng)"
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case name, category, address, center, kind
+        case placeId = "place_id"
+        case fullAddress = "full_address"
+        case distanceM = "distance_m"
+    }
+}
+
+/// `GET /api/geo/places/nearby` envelope.
+public struct GeoNearbyPlacesResponse: Decodable, Sendable, Hashable {
+    public let places: [GeoPlace]
+    public let locality: GeoPlace?
+}
+
+/// `GET /api/geo/places/search` envelope.
+public struct GeoPlaceSearchResponse: Decodable, Sendable, Hashable {
+    public let places: [GeoPlace]
+}

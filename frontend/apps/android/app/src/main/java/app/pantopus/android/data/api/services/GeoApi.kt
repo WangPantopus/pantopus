@@ -1,6 +1,8 @@
 package app.pantopus.android.data.api.services
 
 import app.pantopus.android.data.api.models.geo.GeoAutocompleteResponse
+import app.pantopus.android.data.api.models.geo.GeoNearbyPlacesResponse
+import app.pantopus.android.data.api.models.geo.GeoPlaceSearchResponse
 import app.pantopus.android.data.api.models.geo.GeoResolveRequest
 import app.pantopus.android.data.api.models.geo.GeoResolveResponse
 import app.pantopus.android.data.api.models.geo.GeoReverseResponse
@@ -36,4 +38,27 @@ interface GeoApi {
         @Query("lat") latitude: Double,
         @Query("lon") longitude: Double,
     ): GeoReverseResponse
+
+    /**
+     * Nearby named places (POIs) + the enclosing locality, for
+     * Instagram-style post tagging.
+     * Route `backend/routes/geo.js` (`GET /geo/places/nearby`).
+     */
+    @GET("api/geo/places/nearby")
+    suspend fun nearbyPlaces(
+        @Query("lat") lat: Double,
+        @Query("lng") lng: Double,
+    ): GeoNearbyPlacesResponse
+
+    /**
+     * Place search (POI / place / address), proximity-biased when device
+     * coords are supplied. Queries under 2 chars short-circuit server-side.
+     * Route `backend/routes/geo.js` (`GET /geo/places/search`).
+     */
+    @GET("api/geo/places/search")
+    suspend fun searchPlaces(
+        @Query("q") q: String,
+        @Query("lat") lat: Double?,
+        @Query("lng") lng: Double?,
+    ): GeoPlaceSearchResponse
 }
