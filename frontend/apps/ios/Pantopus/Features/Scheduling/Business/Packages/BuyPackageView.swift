@@ -265,7 +265,7 @@ struct BuyPackageView: View {
                 Icon(.checkCircle, size: 34, color: Theme.Color.success)
             }
             Text("Credits added")
-                .font(.system(size: 20, weight: .semibold))
+                .pantopusTextStyle(.h3)
                 .foregroundStyle(Theme.Color.appText)
             Text("Your package credits are ready. Book a session any time before they expire.")
                 .font(.system(size: 13.5))
