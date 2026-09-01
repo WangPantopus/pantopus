@@ -87,9 +87,23 @@ enum AddressVerificationError: String, CaseIterable {
     }
 
     /// Extract an address refusal from an API error, if that is what it is.
+    ///
+    /// Server errors are inspected too: `ADDRESS_VALIDATION_UNAVAILABLE` — the
+    /// one retryable case, the provider outage — arrives as HTTP 503, which the
+    /// networking layer surfaces as `.server`, not `.clientError`. Matching
+    /// only client errors made the outage code unreachable during the exact
+    /// incident it exists for.
     static func from(_ error: any Error) -> AddressVerificationError? {
-        guard case let APIError.clientError(_, message) = error,
-              let raw = message,
+        let raw: String?
+        switch error {
+        case let APIError.clientError(_, message):
+            raw = message
+        case let APIError.server(_, body):
+            raw = body
+        default:
+            return nil
+        }
+        guard let raw,
               let data = raw.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let code = json["code"] as? String else {

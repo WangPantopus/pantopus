@@ -86,6 +86,22 @@ class AddressVerificationErrorTest {
     }
 
     @Test
+    fun `the outage code is parsed out of a 503, not just a 4xx`() {
+        // The backend sends ADDRESS_VALIDATION_UNAVAILABLE as HTTP 503, which
+        // the networking layer surfaces as NetworkError.Server. Matching only
+        // ClientError made the one retryable case unreachable during the exact
+        // outage it was written for.
+        val body = """{"error":"Address verification is temporarily unavailable.","code":"ADDRESS_VALIDATION_UNAVAILABLE"}"""
+        assertEquals(
+            AddressVerificationError.UNAVAILABLE,
+            AddressVerificationError.from(NetworkError.Server(503, body)),
+        )
+
+        // Other 5xx bodies without an address code stay unmapped.
+        assertNull(AddressVerificationError.from(NetworkError.Server(500, "oops")))
+    }
+
+    @Test
     fun `refusals the address step can fix route back to it`() {
         assertTrue(AddressVerificationError.MISSING_UNIT.isFixableInAddressStep)
         assertTrue(AddressVerificationError.PO_BOX.isFixableInAddressStep)

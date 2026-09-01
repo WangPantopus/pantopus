@@ -74,6 +74,20 @@ struct AddressVerificationErrorTests {
         #expect(AddressVerificationError.unavailable.isRetryable)
     }
 
+    @Test("the outage code is parsed out of a 503, not just a 4xx")
+    func serverErrorCarriesTheOutageCode() {
+        // The backend sends ADDRESS_VALIDATION_UNAVAILABLE as HTTP 503, which
+        // the networking layer surfaces as .server. Matching only .clientError
+        // made the one retryable case unreachable during the exact outage it
+        // was written for.
+        let body = #"{"error":"Address verification is temporarily unavailable.","code":"ADDRESS_VALIDATION_UNAVAILABLE"}"#
+        let mapped = AddressVerificationError.from(APIError.server(status: 503, body: body))
+        #expect(mapped == .unavailable)
+
+        // Other 5xx bodies without an address code stay unmapped.
+        #expect(AddressVerificationError.from(APIError.server(status: 500, body: "oops")) == nil)
+    }
+
     @Test("refusals the address step can fix route back to it")
     func fixableRouting() {
         #expect(AddressVerificationError.missingUnit.isFixableInAddressStep)

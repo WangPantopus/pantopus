@@ -104,9 +104,22 @@ enum class AddressVerificationError(
     companion object {
         private val byCode = entries.associateBy { it.code }
 
-        /** Extract an address refusal from a network error, if that is what it is. */
+        /**
+         * Extract an address refusal from a network error, if that is what it is.
+         *
+         * Server errors are inspected too: ADDRESS_VALIDATION_UNAVAILABLE — the
+         * one retryable case, the provider outage — arrives as HTTP 503, which
+         * the networking layer surfaces as [NetworkError.Server], not
+         * [NetworkError.ClientError]. Matching only client errors made the
+         * outage code unreachable during the exact incident it exists for.
+         */
         fun from(error: NetworkError): AddressVerificationError? {
-            val body = (error as? NetworkError.ClientError)?.body ?: return null
+            val body =
+                when (error) {
+                    is NetworkError.ClientError -> error.body
+                    is NetworkError.Server -> error.body
+                    else -> null
+                } ?: return null
             val code =
                 runCatching { JSONObject(body).optString("code") }
                     .getOrNull()
