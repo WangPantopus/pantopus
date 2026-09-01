@@ -39,6 +39,14 @@ const ESCALATED_METHODS = new Set([
   'admin_override',
   'owner_bootstrap',
   'owner_invite',
+  // mail_code carries its own proof: confirmCode only reaches attach after a
+  // timing-safe match against the hash of a code that was physically mailed to
+  // the address. Requiring a pre-verified AddressClaim *on top of that* was
+  // circular - nothing in the mail path creates one, so every correct postcard
+  // code failed here with "no verified claim" and the channel could not
+  // complete a single verification. The role stays capped at 'member' by
+  // VERIFICATION_ROLE_MAP regardless of the claimType passed.
+  'mail_code',
 ]);
 
 /** claim_type → default occupancy role. */

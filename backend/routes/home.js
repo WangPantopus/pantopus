@@ -137,6 +137,9 @@ const createHomeSchema = Joi.object({
   year_built: Joi.number().integer().min(1600).max(2100).optional().allow(null),
   move_in_date: Joi.string().optional().allow('', null),
   is_owner: Joi.boolean().optional(),
+  // "My home doesn't have a unit number" — clears the MISSING_UNIT refusal
+  // only; see the gate in POST / for what it does and does not relax.
+  no_unit_attestation: Joi.boolean().optional(),
   role: Joi.string().valid('owner', 'renter', 'household', 'property_manager', 'guest').optional(),
   description: Joi.string().max(2000).optional().allow('', null),
   entry_instructions: Joi.string().max(2000).optional().allow('', null),
@@ -1050,9 +1053,26 @@ router.post('/', verifyToken, (req, res, next) => {
       stepUpPolicy
       && STEP_UP_ELIGIBLE_HOME_VERDICT_STATUSES.has(addressVerdict?.status)
     );
+
+    // SCN-10: MISSING_UNIT fires when USPS expects a secondary the submitted
+    // address lacks — which is also what a basement, rear, ADU or split-duplex
+    // address looks like, since USPS does not list those units. Those residents
+    // had no way out: the wizard asked for a unit, accepted one, and asked
+    // again. An explicit attestation ("my home doesn't have a unit number")
+    // clears exactly this rung and nothing else — deliverability, BUSINESS,
+    // CONFLICT and the rest still refuse — and it only relaxes address
+    // granularity, not residency: mail verification and household conflict
+    // still gate everything the address unlocks. The attestation is recorded
+    // in the create outcome so review can find serial attesters.
+    const allowCreateWithNoUnitAttestation = !!(
+      req.body.no_unit_attestation === true
+      && addressVerdict?.status === AddressVerdictStatus.MISSING_UNIT
+    );
+
     if (
       addressVerdict &&
       !allowCreateAfterStepUp &&
+      !allowCreateWithNoUnitAttestation &&
       !ALLOWED_HOME_VERDICT_STATUSES.has(addressVerdict.status)
     ) {
       const problem = getHomeValidationError(addressVerdict);
@@ -1508,7 +1528,9 @@ router.post('/', verifyToken, (req, res, next) => {
       address_id: canonicalAddress?.id || response.address_id || requestedAddressId || null,
       outcome: 'created',
       verdict_status: addressVerdict?.status || null,
-      reasons: addressVerdict?.reasons || [],
+      reasons: allowCreateWithNoUnitAttestation
+        ? [...(addressVerdict?.reasons || []), 'no_unit_attestation']
+        : (addressVerdict?.reasons || []),
       code: 'HOME_CREATED',
       status_code: 201,
       validation_path: createHomeValidationPath,
@@ -6838,7 +6860,13 @@ router.get('/:id/dashboard', verifyToken, async (req, res) => {
  * Provisional users get local/public discovery access.
  * Mailbox and private home surfaces remain locked until verified.
  */
-router.post('/:id/claim', verifyToken, async (req, res) => {
+// postcardLimiter sits AFTER verifyToken so it keys on the user id. The only
+// limiter otherwise covering this route is homeCreationLimiter, which app.js
+// mounts before any authentication runs — keyed on IP, shared with every other
+// home write. The cold-start branch below spends real postage per request, so
+// it gets the same 3-per-hour per-user budget as request-postcard.
+const { postcardLimiter: claimPostcardLimiter } = require('../middleware/rateLimiter');
+router.post('/:id/claim', verifyToken, claimPostcardLimiter, async (req, res) => {
   try {
     const homeId = req.params.id;
     const userId = req.user.id;

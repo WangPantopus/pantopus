@@ -694,6 +694,29 @@ class MailVerificationService {
       .update({ used_at: new Date().toISOString() })
       .eq('id', token.id);
 
+    // Possession of the mailed code is the strongest self-service proof the
+    // system has, so record it on the claim ledger: any pending AddressClaim
+    // this user holds on the address becomes verified/mail_code. Best-effort -
+    // the attach below does not depend on it (mail_code is an escalated
+    // method), but leaving the claim 'pending' after the mail proved it would
+    // make the ledger disagree with the occupancy forever.
+    try {
+      await supabaseAdmin
+        .from('AddressClaim')
+        .update({
+          claim_status: 'verified',
+          verification_method: 'mail_code',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId)
+        .eq('address_id', attempt.address_id)
+        .eq('claim_status', 'pending');
+    } catch (claimErr) {
+      logger.warn('MailVerificationService.confirmCode: claim stamp failed (non-fatal)', {
+        userId, addressId: attempt.address_id, error: claimErr.message,
+      });
+    }
+
     // ── 8. Create/update HomeOccupancy ───────────────────────
     const occupancyResult = await this._attachOccupancy(userId, attempt.address_id);
 
