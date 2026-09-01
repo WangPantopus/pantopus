@@ -1,5 +1,15 @@
 # Pantopus Home Address Verification — Deep Audit
 
+> **⚠️ Historical snapshot — do not read as a description of the current system.**
+> This audit describes the tree as of **2026-08-22**, *before* the
+> `fix/address-verification-security` branch. That branch exists to remediate
+> these findings, and most of the criticals below — the three total bypasses,
+> the plaintext codes, the household takeover paths, the undispatched
+> postcards — are closed on it. Every `file:line` reference is to the
+> pre-remediation tree and many no longer resolve. For what was fixed and what
+> remains open, read the branch's commit messages, which name their finding
+> ids, and the follow-up branch reviews.
+
 **Date:** 2026-08-22 · **Scope:** the complete home-address verification system — validation pipeline, decision engine, provider layer, both physical-mail paths, household claim and authority, lifecycle, data model and RLS, and the web/iOS/Android surfaces.
 
 **Method.** Six parallel subsystem maps, then eight independent dimension audits (security & abuse, scenario coverage, privacy & compliance, lifecycle, reliability, UX & accessibility, cost & efficiency, i18n & architecture). Every finding was then judged by two independent adversarial verifiers — one testing *"does the code actually do this?"*, one testing *"does it actually matter?"* — and dropped only when **both** refuted it. A completeness critic then hunted for code the audit never opened and closed those gaps itself. 135 findings were raised, 3 refuted by both lenses, and 10 added by the critic: **140 findings**, of which **16 are contested** by one verifier and marked as such.

@@ -112,6 +112,9 @@ export default function NewHomePage() {
   const [validatingAddress, setValidatingAddress] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // "My home doesn't have a unit number" — survives the revalidate it triggers,
+  // resets with the address. Sent to the server as no_unit_attestation.
+  const [noUnitAttested, setNoUnitAttested] = useState(false);
 
   // Step 1 — Location
   const [addressText, setAddressText] = useState('');
@@ -182,6 +185,7 @@ export default function NewHomePage() {
 
   const resetAddressValidation = () => {
     setValidatedAddressId(null);
+    setNoUnitAttested(false);
     setAddressCheckResult(null);
     setExistingHomeId(null);
     setIsClaimingExistingHome(false);
@@ -255,6 +259,7 @@ export default function NewHomePage() {
       address_id: validatedAddressId || undefined,
       address: normalized.address,
       unit_number: unit.trim() || undefined,
+      no_unit_attestation: noUnitAttested || undefined,
       city: normalized.city,
       state: normalized.state,
       zip_code: normalized.zipcode,
@@ -371,8 +376,10 @@ export default function NewHomePage() {
   const totalSteps = visibleSteps.length;
   const displayStep = Math.max(1, visibleSteps.findIndex((s) => s.id === step) + 1);
 
-  const verifyAddress = async () => {
+  const verifyAddress = async (opts?: { attestNoUnit?: boolean }) => {
     if (!normalized) return false;
+    const attestedNoUnit = opts?.attestNoUnit || noUnitAttested;
+    if (opts?.attestNoUnit) setNoUnitAttested(true);
 
     setError('');
     setFieldErrors({});
@@ -409,6 +416,11 @@ export default function NewHomePage() {
 
       switch (verdict?.status) {
         case 'MISSING_UNIT':
+          // USPS expects a secondary here — which is also what a basement,
+          // rear, ADU or split-duplex address looks like. With the user's
+          // explicit attestation the server accepts the base address, so fall
+          // through to the success path instead of looping them forever.
+          if (attestedNoUnit) break;
           setValidatedAddressId(null);
           setFieldErrors({ unit_number: 'This address needs a unit or apartment number.' });
           setError('Please fix the highlighted fields.');
@@ -539,7 +551,7 @@ export default function NewHomePage() {
       setAddressCheckResult(resolvedResult);
       setExistingHomeId(resolvedResult.home_id || conflictFallbackResult?.home_id || null);
 
-      if (resolvedResult.is_multi_unit && !resolvedUnit) {
+      if (resolvedResult.is_multi_unit && !resolvedUnit && !attestedNoUnit) {
         setFieldErrors({ unit_number: 'This address needs a unit or apartment number.' });
         setError('Please fix the highlighted fields.');
         return false;
@@ -809,9 +821,26 @@ export default function NewHomePage() {
                   Apt 12B, Unit 4, Ste 200, #3 — whichever appears on your mail.
                 </p>
                 {fieldErrors.unit_number ? (
-                  <p id="err-unit_number" role="alert" className="mt-1 text-xs text-red-600">
-                    {fieldErrors.unit_number}
-                  </p>
+                  <>
+                    <p id="err-unit_number" role="alert" className="mt-1 text-xs text-red-600">
+                      {fieldErrors.unit_number}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFieldErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.unit_number;
+                          return next;
+                        });
+                        setError('');
+                        void verifyAddress({ attestNoUnit: true });
+                      }}
+                      className="mt-1 text-xs text-app-text-secondary underline underline-offset-2 hover:text-app-text-strong"
+                    >
+                      My home doesn&apos;t have a unit number
+                    </button>
+                  </>
                 ) : null}
               </div>
 

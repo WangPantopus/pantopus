@@ -256,3 +256,55 @@ describe('POST /api/homes/:id/detach goes through the chokepoint', () => {
     expect(getTable('Home').find((h) => h.id === 'home-det-1').owner_id).toBeNull();
   });
 });
+
+describe('MISSING_UNIT with the no-unit attestation', () => {
+  const { recordCreateHomeOutcome } = require('../../services/addressValidation/addressVerificationObservability');
+
+  beforeEach(() => {
+    pipelineService.runValidationPipeline.mockResolvedValue({
+      verdict: { status: 'MISSING_UNIT', confidence: 0.3, reasons: ['missing_secondary'] },
+      canonical_address: null,
+      address_id: null,
+    });
+  });
+
+  test('without the attestation the refusal stands', async () => {
+    const app = createApp();
+    const res = await request(app).post('/api/homes').send(CREATE_BODY);
+
+    expect(res.status).toBe(422);
+    expect(res.body.code).toBe('ADDRESS_MISSING_UNIT');
+    expect(getTable('Home')).toHaveLength(0);
+  });
+
+  test('the attestation clears exactly this rung and is recorded', async () => {
+    const app = createApp();
+    const res = await request(app)
+      .post('/api/homes')
+      .send({ ...CREATE_BODY, no_unit_attestation: true });
+
+    expect(res.status).toBe(201);
+    expect(getTable('Home')).toHaveLength(1);
+
+    const created = recordCreateHomeOutcome.mock.calls
+      .map(([o]) => o)
+      .find((o) => o.outcome === 'created');
+    expect(created).toBeTruthy();
+    expect(created.reasons).toContain('no_unit_attestation');
+  });
+
+  test('the attestation does not clear any other refusal', async () => {
+    pipelineService.runValidationPipeline.mockResolvedValue({
+      verdict: { status: 'UNDELIVERABLE', confidence: 0.1, reasons: [] },
+      canonical_address: null,
+      address_id: null,
+    });
+    const app = createApp();
+    const res = await request(app)
+      .post('/api/homes')
+      .send({ ...CREATE_BODY, no_unit_attestation: true });
+
+    expect(res.status).toBe(422);
+    expect(getTable('Home')).toHaveLength(0);
+  });
+});
