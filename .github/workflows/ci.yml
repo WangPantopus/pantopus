@@ -120,7 +120,8 @@ jobs:
             echo "Skipping production Identity Firewall Playwright test; tests/e2e/identity-firewall.spec.ts is not present in this native repo."
           fi
 
-      # Pre-existing TS errors exist — runs but won't block CI for now
-      - name: Type-check web
-        run: pnpm --filter=@pantopus/web type-check
-        continue-on-error: true
+      # The gate grandfathers the pre-existing error backlog
+      # (tsc-baseline.json) and fails ONLY on new type errors — the old
+      # continue-on-error step let every regression sail through.
+      - name: Type-check web (baseline gate)
+        run: pnpm --filter=@pantopus/web type-check:gate

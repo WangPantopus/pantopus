@@ -27,13 +27,10 @@ const router = express.Router();
 
 const verifyToken = require('../middleware/verifyToken');
 const { residencyLetterIssueLimiter } = require('../middleware/rateLimiter');
-const { checkHomePermission } = require('../utils/homePermissions');
+const { checkHomePermission, isVerifiedResident } = require('../utils/homePermissions');
 const residencyLetterService = require('../services/residencyLetterService');
 const logger = require('../utils/logger');
 
-function isVerifiedResident(access) {
-  return Boolean(access && access.occupancy && access.occupancy.verification_status === 'verified');
-}
 
 // POST /api/homes/:id/residency-letters — issue
 router.post('/:id/residency-letters', verifyToken, residencyLetterIssueLimiter, async (req, res) => {

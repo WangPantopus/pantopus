@@ -17,9 +17,13 @@ const request = require('supertest');
 
 const featureFlagService = require('../../services/featureFlagService');
 jest.mock('../../services/notificationService');
-jest.mock('../../middleware/rateLimiter', () => ({
-  personaFollowLimiter: (_req, _res, next) => next(),
-}));
+jest.mock('../../middleware/rateLimiter', () => {
+  // A Proxy, not a hand-listed set: an exhaustive mock silently
+  // breaks ("argument handler must be a function") the moment a
+  // route uses a limiter the list forgot.
+  const noop = (req, res, next) => next();
+  return new Proxy({}, { get: () => noop });
+});
 const notificationService = require('../../services/notificationService');
 const personasRouter = require('../../routes/personas');
 

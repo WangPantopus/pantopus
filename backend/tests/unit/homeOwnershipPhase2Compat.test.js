@@ -33,11 +33,13 @@ jest.mock('../../services/notificationService', () => ({
   notifyHomeInviteAccepted: jest.fn(async () => ({ id: 'notification-3' })),
   notifyOwnershipDispute: jest.fn(async () => ({ id: 'notification-4' })),
 }));
-jest.mock('../../middleware/rateLimiter', () => ({
-  ownershipClaimLimiter: (_req, _res, next) => next(),
-  postcardLimiter: (_req, _res, next) => next(),
-  verificationAttemptLimiter: (_req, _res, next) => next(),
-}));
+jest.mock('../../middleware/rateLimiter', () => {
+  // A Proxy, not a hand-listed set: an exhaustive mock silently
+  // breaks ("argument handler must be a function") the moment a
+  // route uses a limiter the list forgot.
+  const noop = (req, res, next) => next();
+  return new Proxy({}, { get: () => noop });
+});
 jest.mock('../../services/occupancyAttachService', () => ({
   attach: jest.fn(async () => ({ success: true, occupancy: { id: 'occ-1' } })),
 }));

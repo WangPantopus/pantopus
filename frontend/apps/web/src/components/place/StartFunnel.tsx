@@ -17,6 +17,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -35,7 +36,7 @@ import {
   House,
 } from 'lucide-react';
 import * as api from '@pantopus/api';
-import type { PlacePreview, PlacePreviewLockedSection } from '@pantopus/api';
+import type { PlacePreview, PlacePreviewLockedSection, PlacePreviewMoneyLead } from '@pantopus/api';
 import { Group, SectionCard, LockedCard, DensityCard, PlaceHeader, TextButton } from '@/components/archetypes/place';
 import { ShimmerBlock } from '@/components/ui/Shimmer';
 import { getStoreDownloadCta } from '@/lib/publicShare';
@@ -130,7 +131,7 @@ function HeroStep({
         </div>
       </div>
 
-      <div className="flex justify-center">
+      <div className="flex flex-col items-center gap-0.5">
         <button
           type="button"
           onClick={onBrowse}
@@ -139,6 +140,28 @@ function HeroStep({
           Just here to follow someone or browse?
           <ArrowRight size={14} strokeWidth={2.25} className="text-primary-600" />
         </button>
+        {/*
+          The "you are a different kind of user than this funnel assumes"
+          affordance, for the shopper. This funnel asks people to claim
+          the address they live at; Scout's reader is standing outside an
+          open house with twenty minutes before a showing and has no
+          place to save. Routing them by INTENT rather than dropping them
+          into the claim flow is also the only way to find out whether
+          that intent exists — never carry the typed address in the URL.
+
+          `redirectTo`, NOT `intent`: the register page reads redirectTo
+          (via readAuthRedirectQuery) and nothing anywhere reads `intent`,
+          so the first version of this link dropped the shopper into the
+          default /app/place claim flow — the exact funnel it exists to
+          route around.
+        */}
+        <Link
+          href="/register?redirectTo=%2Fapp%2Fplace%2Fscout"
+          className="inline-flex items-center gap-1.5 py-2 px-1 text-[13.5px] font-medium text-app-text-secondary -tracking-[0.005em]"
+        >
+          Considering a place you don&apos;t live at yet?
+          <ArrowRight size={14} strokeWidth={2.25} className="text-primary-600" />
+        </Link>
       </div>
     </div>
   );
@@ -167,6 +190,54 @@ function PreviewHeroCard() {
             Create an account to save this place and keep it updated every day.
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── The money lead — the preview's headline figure (Wave 4) ──
+//
+// A real, free, public benchmark for the AREA: an NFIP tract premium
+// band or a HUD county fair market rent. The server composes the
+// sentence AND the figure — nothing here is computed or rounded client
+// side, because a dollar figure is the most believable thing on the page
+// and the easiest to overclaim.
+//
+// `money_lead: null` means no figure was genuinely available. The tiles
+// then carry the page exactly as they did before this existed: no
+// placeholder, no gap, no invented number.
+// A truthy-but-empty lead object took the hero slot AND rendered nothing
+// in it, leaving a blank card where the page's whole argument goes. The
+// headline is the card, so no headline means fall back to the hero.
+function isRenderableLead(lead: PlacePreviewMoneyLead | null | undefined): lead is PlacePreviewMoneyLead {
+  return !!lead && typeof lead.headline === 'string' && lead.headline.trim().length > 0;
+}
+
+function MoneyLeadCard({ lead }: { lead: PlacePreviewMoneyLead }) {
+  return (
+    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-app-text-secondary">Public preview</span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-app-home-bg text-app-home text-[11px] font-semibold px-2 py-0.5">
+          <ShieldCheck size={12} strokeWidth={2.25} />
+          Free · one-time look
+        </span>
+      </div>
+      <div className="flex items-start gap-3">
+        <span className="inline-flex items-center justify-center shrink-0 w-[42px] h-[42px] rounded-xl bg-app-home-bg text-app-home">
+          {lead.kind === 'flood_premium'
+            ? <Waves size={22} strokeWidth={2} />
+            : <House size={22} strokeWidth={2} />}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[20px] font-bold text-app-text leading-[26px] -tracking-[0.018em]">{lead.headline}</p>
+          <p className="text-[13.5px] text-app-text-secondary leading-[19px] mt-1.5">{lead.detail}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap mt-3 pt-3 border-t border-app-border-subtle text-[12px] text-app-text-muted">
+        <span className="font-medium">{lead.source}</span>
+        <span className="opacity-50">·</span>
+        <span>{lead.scope}-level, not this home</span>
       </div>
     </div>
   );
@@ -319,6 +390,31 @@ function PreviewSkeleton() {
 }
 
 // ── Unsupported region (non-US) ─────────────────────────────
+/**
+ * "We could not read that address" — NOT the geographic denial below.
+ *
+ * `geocodeUsAddress` fails four ways and only one means "outside the US".
+ * Collapsing them showed a US visitor the U.S.-only hand-off during any
+ * geocoder outage, and offered them nothing to do about it. The retry is
+ * the point: adding a city and state usually resolves it.
+ */
+function CouldNotPlace({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="mt-10 flex flex-col items-center text-center px-2">
+      <span className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-app-surface-sunken text-app-text-muted mb-5">
+        <MapPinned size={30} strokeWidth={2} />
+      </span>
+      <h2 className="text-xl font-bold -tracking-[0.02em] text-app-text">We couldn&apos;t find that address</h2>
+      <p className="mt-2 text-sm text-app-text-secondary leading-relaxed max-w-sm">
+        Adding the city and state usually does it — &ldquo;1421 SE Oak St, Portland, OR&rdquo;.
+      </p>
+      <div className="mt-5">
+        <TextButton arrow={false} onClick={onRetry}>Try another address</TextButton>
+      </div>
+    </div>
+  );
+}
+
 function UnsupportedRegion({ onBrowse }: { onBrowse: () => void }) {
   return (
     <div className="mt-10 flex flex-col items-center text-center px-2">
@@ -406,6 +502,8 @@ export default function StartFunnel() {
               <TextButton arrow={false} onClick={() => previewQuery.refetch()}>Try again</TextButton>
             </div>
           </div>
+        ) : preview && preview.status === 'could_not_place' ? (
+          <CouldNotPlace onRetry={() => { setSelected(null); setSubmitted(null); }} />
         ) : preview && preview.status === 'unsupported_region' ? (
           <UnsupportedRegion onBrowse={goBrowse} />
         ) : preview ? (
@@ -425,7 +523,12 @@ export default function StartFunnel() {
                 }
               />
               <div className="mt-4">
-                <PreviewHeroCard />
+                {/* The dollar figure leads when there is a real one;
+                    otherwise the original hero carries the page exactly
+                    as before — never a placeholder in its place. */}
+                {isRenderableLead(preview.money_lead)
+                  ? <MoneyLeadCard lead={preview.money_lead} />
+                  : <PreviewHeroCard />}
               </div>
               <PreviewBody preview={preview} onWall={goWall} />
               <div className="h-4" />

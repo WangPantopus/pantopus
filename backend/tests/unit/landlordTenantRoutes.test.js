@@ -49,13 +49,13 @@ jest.mock('../../services/notificationService', () => ({
 }));
 
 // ── Mock rate limiters ──────────────────────────────────────
-jest.mock('../../middleware/rateLimiter', () => ({
-  globalWriteLimiter: (req, res, next) => next(),
-  ownershipClaimLimiter: (req, res, next) => next(),
-  landlordLeaseLimiter: (req, res, next) => next(),
-  addressValidationLimiter: (req, res, next) => next(),
-  addressClaimLimiter: (req, res, next) => next(),
-}));
+jest.mock('../../middleware/rateLimiter', () => {
+  // A Proxy, not a hand-listed set: an exhaustive mock silently
+  // breaks ("argument handler must be a function") the moment a
+  // route uses a limiter the list forgot.
+  const noop = (req, res, next) => next();
+  return new Proxy({}, { get: () => noop });
+});
 
 // ── Mock verifyToken ────────────────────────────────────────
 jest.mock('../../middleware/verifyToken', () => {

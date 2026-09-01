@@ -168,18 +168,12 @@ jest.mock('../../services/feedService', () => ({
 }));
 
 jest.mock('../../middleware/rateLimiter', () => {
-  const passthrough = (_req, _res, next) => next();
-  return {
-    globalWriteLimiter: passthrough,
-    globalReadLimiter: passthrough,
-    authLimiter: passthrough,
-    postCreateLimiter: passthrough,
-    gigCreateLimiter: passthrough,
-    messageLimiter: passthrough,
-    searchLimiter: passthrough,
-    businessCreateLimiter: passthrough,
-  };
-});
+  // A Proxy, not a hand-listed set: an exhaustive mock silently
+  // breaks ("argument handler must be a function") the moment a
+  // route uses a limiter the list forgot.
+  const noop = (req, res, next) => next();
+  return new Proxy({}, { get: () => noop });
+});;
 
 const express = require('express');
 const request = require('supertest');

@@ -12,7 +12,7 @@
 // wants narrative copy; these wrappers carry the structured contract.
 // ============================================================
 
-import { get } from '../client';
+import { get, put } from '../client';
 import type {
   PlaceIntelligence,
   PlaceDensityBucket,
@@ -29,7 +29,13 @@ import type {
 // recurring/exact, so the client can render the locked cards + soft
 // wall. This mirrors backend/routes/public.js (GET /api/public/place).
 
-export type PlacePreviewStatus = 'ready' | 'partial' | 'unsupported_region';
+/**
+ * `could_not_place` and `unsupported_region` are DIFFERENT answers, and
+ * a client that renders them alike tells a US resident during a geocoder
+ * outage that the product is not for them. Only `unsupported_region`
+ * means the address resolved outside US coverage.
+ */
+export type PlacePreviewStatus = 'ready' | 'partial' | 'could_not_place' | 'unsupported_region';
 
 export interface PlacePreviewFlood {
   status: 'ready' | 'unavailable';
@@ -51,6 +57,28 @@ export interface PlacePreviewArea {
   median_year_built?: number | null;
   median_home_value?: number | null;
   note: string;
+  source: string;
+}
+
+/**
+ * The preview's headline dollar figure (Wave 4). A real, free, public
+ * benchmark for the AREA — an NFIP tract premium band or a HUD county
+ * fair market rent — never a quote, never "your home".
+ *
+ * `money_lead: null` means no figure was genuinely available. The tiles
+ * then carry the page exactly as they did before: NEVER synthesize a
+ * number client-side, and never leave a placeholder where one would be.
+ */
+export interface PlacePreviewMoneyLead {
+  kind: 'flood_premium' | 'rent_band';
+  /** Server-composed sentence with the figure already in it. */
+  headline: string;
+  /** What the figure is drawn from, and what it is not. */
+  detail: string;
+  low: number;
+  high: number;
+  /** The geography the figure describes, e.g. "census tract", "county". */
+  scope: string;
   source: string;
 }
 
@@ -78,6 +106,11 @@ export interface PlacePreview {
     state: string | null;
     zipcode: string | null;
   };
+  /**
+   * The lead figure, above the tiles. Null (or absent) when nothing
+   * real was available — fall back to the tiles, do not invent one.
+   */
+  money_lead?: PlacePreviewMoneyLead | null;
   /** The free demonstration subset (present on ready/partial). */
   free?: {
     flood: PlacePreviewFlood;
@@ -117,4 +150,19 @@ export async function getPlaceIntelligence(
  */
 export async function getPublicPlacePreview(address: string): Promise<PlacePreview> {
   return get<PlacePreview>('/api/public/place', { address });
+}
+
+/**
+ * Systems Ledger — "it was replaced". Records what the household knows
+ * about a system's install year; provenance ratchets, so a resident's
+ * answer is never overwritten by a derived source.
+ *
+ * PUT /api/homes/:id/systems/:key
+ */
+export async function putHomeSystem(
+  homeId: string,
+  systemKey: string,
+  installedYear: number,
+): Promise<{ ok: boolean }> {
+  return put<{ ok: boolean }>(`/api/homes/${homeId}/systems/${systemKey}`, { installed_year: installedYear });
 }
