@@ -70,7 +70,36 @@ async function canUserDeleteHomeRecord(homeId, userId, legacyOwnerId) {
     .eq('owner_status', 'verified')
     .eq('is_primary_owner', true)
     .maybeSingle();
-  return !!row;
+  if (row) return true;
+
+  // Creator fallback: owner_id is no longer set at create time (it arrives
+  // with claim approval), so someone who just created a home by mistake would
+  // otherwise be unable to remove it until a deed verified. Allow the creator
+  // to delete only while the home is still theirs alone - no verified owner,
+  // and no other active member who would lose their household.
+  const { data: home } = await supabaseAdmin
+    .from('Home')
+    .select('created_by_user_id')
+    .eq('id', homeId)
+    .maybeSingle();
+  if (!home || home.created_by_user_id !== userId) return false;
+
+  const { data: verifiedOwners } = await supabaseAdmin
+    .from('HomeOwner')
+    .select('id')
+    .eq('home_id', homeId)
+    .eq('owner_status', 'verified')
+    .limit(1);
+  if (verifiedOwners && verifiedOwners.length > 0) return false;
+
+  const { data: otherMembers } = await supabaseAdmin
+    .from('HomeOccupancy')
+    .select('id')
+    .eq('home_id', homeId)
+    .eq('is_active', true)
+    .neq('user_id', userId)
+    .limit(1);
+  return !otherMembers || otherMembers.length === 0;
 }
 
 // ============ VALIDATION SCHEMAS ============
@@ -1097,9 +1126,18 @@ router.post('/', verifyToken, (req, res, next) => {
       country: countryVal,
       address_hash: addressHash,
       address_id: canonicalAddress?.id || requestedAddressId || null,
-      // owner_id is only set for actual owners — renters who create homes get null.
-      // HomeOwner table + HomeOccupancy.role_base are the real ownership authority.
-      owner_id: is_owner ? userId : null,
+      // owner_id is NEVER set from the request. checkHomePermission treats
+      // Home.owner_id === userId as full ownership - every permission, plus
+      // 'ownership.manage', which is what reviews ownership claims - so
+      // setting it here from a self-asserted boolean handed the caller
+      // verified-owner powers (including approving their own claim) at any
+      // address they typed, before any deed was ever uploaded. The pointer is
+      // written by the two claim-approval paths (routes/admin.js,
+      // routes/homeOwnership.js review) when owner_status becomes 'verified',
+      // which is what spec §7.1 ("prevents instant unverified ownership")
+      // requires. Until then the creator holds the pending_doc occupancy
+      // created below, exactly like a renter-creator holds provisional access.
+      owner_id: null,
       name: name || null,
       home_type: home_type || 'house',
       bedrooms: bedrooms != null ? bedrooms : null,
@@ -3448,27 +3486,43 @@ router.post('/:id/detach', verifyToken, validate(attachDetachSchema), async (req
       return res.status(403).json({ error: 'You do not have permission to manage members' });
     }
 
-    // Check if user is attached
-    const { data: occupancy, error: checkError } = await supabaseAdmin
-      .from('HomeOccupancy')
-      .select('id')
-      .eq('home_id', homeId)
-      .eq('user_id', userToDetach)
-      .single();
-
-    if (checkError || !occupancy) {
-      return res.status(400).json({ error: 'User is not attached to this home' });
+    // Rank guard: removing an owner is an ownership action, not member
+    // management. Without this, an admin could detach the owner's occupancy
+    // while the Home.owner_id pointer stayed behind — stripped of membership
+    // yet still holding full owner access via checkHomePermission.
+    if (userToDetach !== requestingUserId) {
+      const targetIsPointerOwner = home.owner_id === userToDetach;
+      const { data: targetOwnerRow } = await supabaseAdmin
+        .from('HomeOwner')
+        .select('id')
+        .eq('home_id', homeId)
+        .eq('subject_id', userToDetach)
+        .eq('owner_status', 'verified')
+        .maybeSingle();
+      if ((targetIsPointerOwner || targetOwnerRow) && !detachAccess.isOwner) {
+        return res.status(403).json({ error: 'Only an owner can remove an owner from the home' });
+      }
     }
 
-    // Delete occupancy record
-    const { error: detachError } = await supabaseAdmin
-      .from('HomeOccupancy')
-      .delete()
-      .eq('home_id', homeId)
-      .eq('user_id', userToDetach);
+    // LIF-01: go through the single detach chokepoint rather than hard-deleting
+    // the row. detach() deactivates the occupancy (preserving history), clears
+    // the Home.owner_id pointer when the departing user holds it, revokes
+    // outstanding residency letters, and writes the audit entries this route's
+    // raw DELETE used to skip.
+    const occupancyAttachService = require('../services/occupancyAttachService');
+    const detachResult = await occupancyAttachService.detach({
+      homeId,
+      userId: userToDetach,
+      reason: 'removed',
+      actorId: requestingUserId,
+      metadata: { source: 'owner_detach_route' },
+    });
 
-    if (detachError) {
-      logger.error('Error detaching user', { error: detachError.message, homeId, userToDetach });
+    if (!detachResult.success) {
+      if (detachResult.error === 'No active occupancy found') {
+        return res.status(400).json({ error: 'User is not attached to this home' });
+      }
+      logger.error('Error detaching user', { error: detachResult.error, homeId, userToDetach });
       return res.status(500).json({ error: 'Failed to detach user' });
     }
 
