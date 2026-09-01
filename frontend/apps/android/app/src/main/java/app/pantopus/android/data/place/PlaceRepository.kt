@@ -1,6 +1,8 @@
 package app.pantopus.android.data.place
 
 import app.pantopus.android.data.api.models.geo.GeoAutocompleteResponse
+import app.pantopus.android.data.api.models.geo.GeoNearbyPlacesResponse
+import app.pantopus.android.data.api.models.geo.GeoPlaceSearchResponse
 import app.pantopus.android.data.api.models.place.IssueResidencyLetterRequest
 import app.pantopus.android.data.api.models.place.NeighborMessageAck
 import app.pantopus.android.data.api.models.place.NeighborMessageTemplates
@@ -46,6 +48,19 @@ class PlaceRepository
     ) {
         /** Address typeahead for the signed-out funnel (keyless). */
         suspend fun geoAutocomplete(query: String): NetworkResult<GeoAutocompleteResponse> = safeApiCall { geoApi.autocomplete(query) }
+
+        /** Nearby POIs + locality for the compose place tagger. */
+        suspend fun geoNearbyPlaces(
+            latitude: Double,
+            longitude: Double,
+        ): NetworkResult<GeoNearbyPlacesResponse> = safeApiCall { geoApi.nearbyPlaces(latitude, longitude) }
+
+        /** Place search for the compose place tagger; coords bias proximity. */
+        suspend fun geoSearchPlaces(
+            query: String,
+            latitude: Double?,
+            longitude: Double?,
+        ): NetworkResult<GeoPlaceSearchResponse> = safeApiCall { geoApi.searchPlaces(query, latitude, longitude) }
 
         /**
          * The grouped section envelopes for a home. Pass [sections] to

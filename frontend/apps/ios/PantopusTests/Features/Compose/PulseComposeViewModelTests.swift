@@ -263,6 +263,147 @@ final class PulseComposeViewModelTests: XCTestCase {
         XCTAssertEqual(request.safetyAlertKind, "suspicious")
     }
 
+    // MARK: - Place tag
+
+    private static let placeTag = PostPlaceTag(
+        name: "Joe's Coffee",
+        address: "123 Elm St",
+        latitude: 45.521,
+        longitude: -122.681,
+        placeId: "poi.1",
+        kind: "poi"
+    )
+
+    func testPlaceTagFieldsLandOnRequest() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        vm.update(.title, to: "Need a plumber")
+        vm.update(.body, to: "Pipe is leaking.")
+        vm.selectPlaceTag(Self.placeTag)
+        let request = vm.buildRequest()
+        XCTAssertEqual(request.latitude, 45.521)
+        XCTAssertEqual(request.longitude, -122.681)
+        XCTAssertEqual(request.locationName, "Joe's Coffee")
+        XCTAssertEqual(request.locationAddress, "123 Elm St")
+        XCTAssertEqual(request.geocodeProvider, "mapbox")
+        XCTAssertEqual(request.geocodeAccuracy, "poi")
+        XCTAssertEqual(request.geocodePlaceId, "poi.1")
+    }
+
+    /// The tag is applied AFTER `mergeTargetContext` full-copies the
+    /// request, so the picked venue wins over the flow target's
+    /// location — while GPS attestation keeps attesting the device fix.
+    func testPlaceTagOverridesFlowTargetLocation() {
+        let vm = PulseComposeViewModel(
+            intent: .announce,
+            postingTarget: .currentLocation(latitude: 45.5, longitude: -122.4, label: "Camas, WA"),
+            composePurpose: .localUpdate,
+            api: makeAPI()
+        )
+        vm.update(.title, to: "New coffee spot")
+        vm.update(.body, to: "Great pour-overs.")
+        vm.selectPlaceTag(Self.placeTag)
+        let request = vm.buildRequest()
+        XCTAssertEqual(request.latitude, 45.521)
+        XCTAssertEqual(request.longitude, -122.681)
+        XCTAssertEqual(request.locationName, "Joe's Coffee")
+        XCTAssertEqual(request.geocodePlaceId, "poi.1")
+        // GPS attestation is untouched — it attests the device fix.
+        XCTAssertEqual(request.gpsLatitude, 45.5)
+        XCTAssertEqual(request.gpsLongitude, -122.4)
+        XCTAssertNotNil(request.gpsTimestamp)
+    }
+
+    func testClearPlaceTagRemovesFields() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        vm.update(.title, to: "Need a plumber")
+        vm.update(.body, to: "Pipe is leaking.")
+        vm.selectPlaceTag(Self.placeTag)
+        vm.clearPlaceTag()
+        XCTAssertNil(vm.selectedPlaceTag)
+        let request = vm.buildRequest()
+        XCTAssertNil(request.latitude)
+        XCTAssertNil(request.longitude)
+        XCTAssertNil(request.locationName)
+        XCTAssertNil(request.locationAddress)
+        XCTAssertNil(request.geocodeProvider)
+        XCTAssertNil(request.geocodeAccuracy)
+        XCTAssertNil(request.geocodePlaceId)
+    }
+
+    func testPlaceTagMarksDirty() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        XCTAssertFalse(vm.isDirty)
+        vm.selectPlaceTag(Self.placeTag)
+        XCTAssertTrue(vm.isDirty)
+        vm.clearPlaceTag()
+        XCTAssertFalse(vm.isDirty)
+    }
+
+    func testPlaceTagDoesNotDirtyEditMode() {
+        // Place tags are create-only: buildUpdateRequest carries no
+        // location fields, so a tag must never enable a no-op Save.
+        let vm = PulseComposeViewModel(intent: .ask, postId: "post-1", api: makeAPI())
+        vm.selectPlaceTag(Self.placeTag)
+        XCTAssertFalse(vm.isDirty)
+    }
+
+    // MARK: - Media capture location (ADDENDUM 2)
+
+    func testMediaCaptureLocationRecomputesOnAddAndRemove() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        XCTAssertNil(vm.mediaCaptureLocation)
+
+        // First GEOTAGGED photo wins, even when an untagged one precedes it.
+        let untagged = PulseComposePhoto(data: Data([0x1]))
+        let tagged = PulseComposePhoto(
+            data: Data([0x2]),
+            capturedLatitude: 41.8781,
+            capturedLongitude: -87.6298
+        )
+        vm.setPhotos([untagged, tagged])
+        XCTAssertEqual(vm.mediaCaptureLocation?.latitude ?? 0, 41.8781, accuracy: 0.0001)
+        XCTAssertEqual(vm.mediaCaptureLocation?.longitude ?? 0, -87.6298, accuracy: 0.0001)
+
+        // Removing the geotagged photo clears the anchor.
+        vm.remove(photo: tagged.id)
+        XCTAssertNil(vm.mediaCaptureLocation)
+        vm.remove(photo: untagged.id)
+        XCTAssertNil(vm.mediaCaptureLocation)
+    }
+
+    func testMediaCaptureLocationPrefersEarliestGeotaggedPhoto() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        vm.append(photo: PulseComposePhoto(
+            data: Data([0x1]),
+            capturedLatitude: 41.8781,
+            capturedLongitude: -87.6298
+        ))
+        vm.append(photo: PulseComposePhoto(
+            data: Data([0x2]),
+            capturedLatitude: 30.2672,
+            capturedLongitude: -97.7431
+        ))
+        XCTAssertEqual(vm.mediaCaptureLocation?.latitude ?? 0, 41.8781, accuracy: 0.0001)
+    }
+
+    /// PRIVACY: the media capture location never leaks onto the outgoing
+    /// request — the body carries only an explicitly picked venue.
+    func testMediaCaptureLocationNeverRidesTheRequest() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        vm.update(.title, to: "Need a plumber")
+        vm.update(.body, to: "Pipe is leaking.")
+        vm.setPhotos([PulseComposePhoto(
+            data: Data([0x2]),
+            capturedLatitude: 41.8781,
+            capturedLongitude: -87.6298
+        )])
+        let request = vm.buildRequest()
+        XCTAssertNil(request.latitude)
+        XCTAssertNil(request.longitude)
+        XCTAssertNil(request.locationName)
+        XCTAssertNil(request.geocodePlaceId)
+    }
+
     // MARK: - Submit pipeline
 
     func testSubmitHappyPathSucceedsAndDismisses() async {

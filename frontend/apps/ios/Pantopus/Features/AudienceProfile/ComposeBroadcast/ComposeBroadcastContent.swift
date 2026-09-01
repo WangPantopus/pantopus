@@ -88,6 +88,11 @@ public struct ComposeMediaPreview: Sendable, Hashable, Identifiable {
     /// Randomised on pick so the library's `IMG_xxxx` never reaches S3.
     public let fileName: String
     public let mimeType: String
+    /// Where the media was captured (EXIF GPS / video metadata), when
+    /// present. A local place-picker anchor hint ONLY — never sent on
+    /// the publish body or any other request.
+    public let capturedLatitude: Double?
+    public let capturedLongitude: Double?
 
     public init(
         id: String = UUID().uuidString,
@@ -96,7 +101,9 @@ public struct ComposeMediaPreview: Sendable, Hashable, Identifiable {
         data: Data? = nil,
         remoteURL: String? = nil,
         fileName: String? = nil,
-        mimeType: String? = nil
+        mimeType: String? = nil,
+        capturedLatitude: Double? = nil,
+        capturedLongitude: Double? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -106,6 +113,8 @@ public struct ComposeMediaPreview: Sendable, Hashable, Identifiable {
         let defaultMime = kind == .video ? "video/mp4" : "image/jpeg"
         self.mimeType = mimeType ?? defaultMime
         self.fileName = fileName ?? "broadcast-\(id.prefix(8)).\(kind == .video ? "mp4" : "jpg")"
+        self.capturedLatitude = capturedLatitude
+        self.capturedLongitude = capturedLongitude
     }
 
     /// Ready to ship to the multipart route.

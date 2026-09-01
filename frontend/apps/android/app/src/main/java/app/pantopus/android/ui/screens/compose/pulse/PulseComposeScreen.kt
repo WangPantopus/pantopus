@@ -70,6 +70,9 @@ import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.components.Toast
 import app.pantopus.android.ui.components.ToastKind
 import app.pantopus.android.ui.components.ToastMessage
+import app.pantopus.android.ui.screens.compose.placepicker.MediaLocationExtractor
+import app.pantopus.android.ui.screens.compose.placepicker.PlacePickerSheet
+import app.pantopus.android.ui.screens.compose.placepicker.PostPlaceTag
 import app.pantopus.android.ui.screens.shared.form.FormFieldGroup
 import app.pantopus.android.ui.screens.shared.form.FormFieldState
 import app.pantopus.android.ui.screens.shared.form.FormShell
@@ -127,6 +130,8 @@ fun PulseComposeScreen(
     val toast by viewModel.toast.collectAsStateWithLifecycle()
     val shouldDismiss by viewModel.shouldDismiss.collectAsStateWithLifecycle()
     val prefillState by viewModel.prefillState.collectAsStateWithLifecycle()
+    val selectedPlaceTag by viewModel.selectedPlaceTag.collectAsStateWithLifecycle()
+    var showPlacePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(flowTarget, flowPurpose) {
         if (flowTarget != null) {
@@ -178,7 +183,23 @@ fun PulseComposeScreen(
                     withContext(Dispatchers.IO) {
                         uris.take(PULSE_COMPOSE_MAX_PHOTOS).mapNotNull { uri ->
                             readBytes(context.contentResolver, uri)?.let { bytes ->
-                                PulseComposePhoto(id = UUID.randomUUID().toString(), data = bytes)
+                                // Capture-location anchor (ADDENDUM 2):
+                                // EXIF GPS is read off the picked bytes as
+                                // a LOCAL place-picker anchor only — it is
+                                // never auto-attached to the outgoing post.
+                                // On API 29+ the system photo picker
+                                // redacts location EXIF at read time
+                                // (ACCESS_MEDIA_LOCATION does not apply to
+                                // picker URIs), so this legitimately
+                                // returns null there → no anchor chips;
+                                // API 26-28 bytes still carry GPS.
+                                val captured = MediaLocationExtractor.fromImageBytes(bytes)
+                                PulseComposePhoto(
+                                    id = UUID.randomUUID().toString(),
+                                    data = bytes,
+                                    capturedLatitude = captured?.latitude,
+                                    capturedLongitude = captured?.longitude,
+                                )
                             }
                         }
                     }
@@ -211,6 +232,7 @@ fun PulseComposeScreen(
             recommendRating
             activeIntent
             dealExpiresAt
+            selectedPlaceTag
             state
         }
         FormShell(
@@ -249,6 +271,7 @@ fun PulseComposeScreen(
                                 recommendRating = recommendRating,
                                 fields = fields,
                                 photos = photos,
+                                selectedPlaceTag = selectedPlaceTag,
                                 isIntentLocked = viewModel.isIntentLocked,
                                 isFlowMode = viewModel.isFlowMode,
                                 composePurpose = viewModel.flowPurpose,
@@ -278,6 +301,8 @@ fun PulseComposeScreen(
                                 onRemovePhoto = viewModel::removePhoto,
                                 onBodyEditingEnded = viewModel::runPrecheck,
                                 onDismissPrecheckNudge = viewModel::dismissPrecheckNudge,
+                                onAddLocation = { showPlacePicker = true },
+                                onClearLocation = viewModel::clearPlaceTag,
                             ),
                     )
             }
@@ -292,6 +317,25 @@ fun PulseComposeScreen(
                         .padding(bottom = Spacing.s10),
             )
         }
+    }
+
+    if (showPlacePicker) {
+        PlacePickerSheet(
+            currentTag = selectedPlaceTag,
+            // Media capture anchor, read at presentation time so it
+            // tracks the current photo set (the sheet re-seeds its VM on
+            // every open).
+            mediaLocation = viewModel.mediaCaptureLocation,
+            onSelect = { tag ->
+                viewModel.selectPlaceTag(tag)
+                showPlacePicker = false
+            },
+            onRemove = {
+                viewModel.clearPlaceTag()
+                showPlacePicker = false
+            },
+            onDismiss = { showPlacePicker = false },
+        )
     }
 }
 
@@ -339,6 +383,8 @@ internal data class PulseComposeContentState(
     val recommendRating: Int = 5,
     val fields: Map<PulseComposeField, FormFieldState> = emptyMap(),
     val photos: List<PulseComposePhoto> = emptyList(),
+    /** Instagram-style venue tag picked in the PlacePickerSheet. */
+    val selectedPlaceTag: PostPlaceTag? = null,
     /** True when the intent picker is non-interactive (edit mode). */
     val isIntentLocked: Boolean = false,
     val isFlowMode: Boolean = false,
@@ -368,6 +414,10 @@ internal data class PulseComposeActions(
     val onBodyEditingEnded: () -> Unit = {},
     /** X on the precheck nudge banner. */
     val onDismissPrecheckNudge: () -> Unit = {},
+    /** Opens the PlacePickerSheet (also re-opens it from a set tag row). */
+    val onAddLocation: () -> Unit = {},
+    /** ✕ on the set-tag row — clears the venue tag. */
+    val onClearLocation: () -> Unit = {},
 )
 
 /**
@@ -420,6 +470,16 @@ private fun PulseComposeBodySections(
         onSelectRecommendRating = actions.selection.onSelectRecommendRating,
     )
     PhotosSection(photos = state.photos, onPick = actions.onPickPhotos, onRemove = actions.onRemovePhoto)
+    // Place tags are create-only (the update pipeline carries no location
+    // fields), so hide the row in edit mode — offering a picker whose
+    // input the Save path drops would lose data. Mirrors iOS.
+    if (!state.isIntentLocked) {
+        LocationSection(
+            tag = state.selectedPlaceTag,
+            onAdd = actions.onAddLocation,
+            onClear = actions.onClearLocation,
+        )
+    }
     if (!state.isFlowMode || state.visibility != PulseComposeVisibility.Connections) {
         VisibilitySection(active = state.visibility, onSelect = actions.selection.onSelectVisibility)
     }
@@ -1315,6 +1375,110 @@ private fun AddPhotoTile(onPick: () -> Unit) {
             style = PantopusTextStyle.caption,
             color = PantopusColors.appTextSecondary,
         )
+    }
+}
+
+/**
+ * Instagram-style place tag — "Add location" opens the shared
+ * PlacePickerSheet; a set tag renders name + address with a ✕ clear
+ * button (the row itself re-opens the picker).
+ */
+@Composable
+private fun LocationSection(
+    tag: PostPlaceTag?,
+    onAdd: () -> Unit,
+    onClear: () -> Unit,
+) {
+    FormFieldGroup("Location (optional)") {
+        if (tag == null) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 44.dp)
+                        .clickable(onClick = onAdd)
+                        .padding(horizontal = Spacing.s2)
+                        .testTag("composePulseAddLocationRow")
+                        .semantics { contentDescription = "Add location" },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.MapPin,
+                    contentDescription = null,
+                    size = 18.dp,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.appTextSecondary,
+                )
+                Text(
+                    text = "Add location",
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.appText,
+                    modifier = Modifier.weight(1f),
+                )
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronRight,
+                    contentDescription = null,
+                    size = 14.dp,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.appTextMuted,
+                )
+            }
+        } else {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 44.dp)
+                        .clickable(onClick = onAdd)
+                        .padding(horizontal = Spacing.s2)
+                        .testTag("composePulseAddLocationRow"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.MapPin,
+                    contentDescription = null,
+                    size = 18.dp,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.primary600,
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = tag.name,
+                        style = PantopusTextStyle.small,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appText,
+                    )
+                    tag.address?.takeIf { it.isNotBlank() }?.let { address ->
+                        Text(
+                            text = address,
+                            style = PantopusTextStyle.caption,
+                            color = PantopusColors.appTextSecondary,
+                        )
+                    }
+                }
+                Box(
+                    modifier =
+                        Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(Radii.pill))
+                            .background(PantopusColors.appSurfaceSunken)
+                            .clickable(onClick = onClear)
+                            .testTag("composePulseClearLocationButton")
+                            .semantics { contentDescription = "Remove location" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.X,
+                        contentDescription = null,
+                        size = 14.dp,
+                        strokeWidth = 2f,
+                        tint = PantopusColors.appTextSecondary,
+                    )
+                }
+            }
+        }
     }
 }
 

@@ -21,6 +21,11 @@ data class PostCreateRequest(
     val latitude: Double? = null,
     val longitude: Double? = null,
     @Json(name = "locationName") val locationName: String? = null,
+    // Instagram-style place tag (venue picked in the PlacePickerSheet).
+    @Json(name = "locationAddress") val locationAddress: String? = null,
+    @Json(name = "geocodeProvider") val geocodeProvider: String? = null,
+    @Json(name = "geocodeAccuracy") val geocodeAccuracy: String? = null,
+    @Json(name = "geocodePlaceId") val geocodePlaceId: String? = null,
     @Json(name = "homeId") val homeId: String? = null,
     @Json(name = "businessId") val businessId: String? = null,
     val tags: List<String>? = null,

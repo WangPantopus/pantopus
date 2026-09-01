@@ -328,4 +328,175 @@ describe('MapboxProvider', () => {
         .rejects.toThrow('No result for address');
     });
   });
+
+  // ── Place-tag picker methods (nearbyPlaces / searchPlaces) ──
+
+  const MAPBOX_POI_FEATURE = {
+    id: 'poi.111',
+    type: 'Feature',
+    place_type: ['poi'],
+    text: 'Blue Star Donuts',
+    place_name: 'Blue Star Donuts, 1237 SW Washington St, Portland, Oregon 97205, United States',
+    center: [-122.6841, 45.5219],
+    properties: { category: 'donut shop, bakery', address: '1237 SW Washington St' },
+    context: [
+      { id: 'postcode.1001', text: '97205' },
+      { id: 'place.2001', text: 'Portland' },
+      { id: 'region.3001', text: 'Oregon', short_code: 'us-or' },
+    ],
+  };
+
+  const MAPBOX_LOCALITY_FEATURE = {
+    id: 'place.67890',
+    type: 'Feature',
+    place_type: ['place'],
+    text: 'Portland',
+    place_name: 'Portland, Oregon, United States',
+    center: [-122.6765, 45.5231],
+    properties: {},
+    context: [
+      { id: 'region.3001', text: 'Oregon', short_code: 'us-or' },
+    ],
+  };
+
+  describe('nearbyPlaces', () => {
+    it('returns NormalizedPlace POIs plus the locality from two typed reverse calls', async () => {
+      mockFetchOk({ features: [MAPBOX_POI_FEATURE] });   // types=poi call
+      mockFetchOk({ features: [MAPBOX_LOCALITY_FEATURE] }); // types=place call
+
+      const result = await mapboxProvider.nearbyPlaces(45.52, -122.68);
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      const poiUrl = global.fetch.mock.calls[0][0];
+      const localityUrl = global.fetch.mock.calls[1][0];
+      expect(poiUrl).toContain('/mapbox.places/-122.68,45.52.json');
+      expect(poiUrl).toContain('types=poi');
+      expect(poiUrl).toContain('limit=10');
+      expect(localityUrl).toContain('types=place');
+      expect(localityUrl).toContain('limit=1');
+
+      expect(result.places).toHaveLength(1);
+      const p = result.places[0];
+      expect(p.place_id).toBe('poi.111');
+      expect(p.name).toBe('Blue Star Donuts');
+      expect(p.category).toBe('donut shop, bakery');
+      expect(p.address).toBe('1237 SW Washington St');
+      expect(p.full_address).toContain('Blue Star Donuts');
+      expect(p.center).toEqual({ lat: 45.5219, lng: -122.6841 });
+      expect(p.kind).toBe('poi');
+      // Haversine from (45.52, -122.68) to the POI center is ~383m.
+      expect(p.distance_m).toBeGreaterThan(350);
+      expect(p.distance_m).toBeLessThan(420);
+      expect(Number.isInteger(p.distance_m)).toBe(true);
+
+      expect(result.locality).not.toBeNull();
+      expect(result.locality.name).toBe('Portland');
+      expect(result.locality.kind).toBe('place');
+    });
+
+    it('returns locality null when no place feature is found', async () => {
+      mockFetchOk({ features: [] });
+      mockFetchOk({ features: [] });
+
+      const result = await mapboxProvider.nearbyPlaces(45.52, -122.68);
+
+      expect(result.places).toEqual([]);
+      expect(result.locality).toBeNull();
+    });
+
+    it('throws on Mapbox failure', async () => {
+      mockFetchError(500, 'Internal Server Error');
+      mockFetchOk({ features: [] });
+
+      await expect(mapboxProvider.nearbyPlaces(45.52, -122.68))
+        .rejects.toThrow('Mapbox nearby places failed: 500');
+    });
+
+    it('degrades to locality null when only the locality call fails', async () => {
+      mockFetchOk({ features: [MAPBOX_POI_FEATURE] }); // types=poi ok
+      mockFetchError(429, 'Rate limited');             // types=place fails
+
+      const result = await mapboxProvider.nearbyPlaces(45.52, -122.68);
+
+      expect(result.places).toHaveLength(1);
+      expect(result.places[0].name).toBe('Blue Star Donuts');
+      expect(result.locality).toBeNull();
+    });
+
+    it('filters out features without a usable center instead of defaulting to {0,0}', async () => {
+      const centerless = { ...MAPBOX_POI_FEATURE, id: 'poi.222', center: undefined };
+      mockFetchOk({ features: [centerless, MAPBOX_POI_FEATURE] });
+      mockFetchOk({ features: [{ ...MAPBOX_LOCALITY_FEATURE, center: null }] });
+
+      const result = await mapboxProvider.nearbyPlaces(45.52, -122.68);
+
+      expect(result.places).toHaveLength(1);
+      expect(result.places[0].place_id).toBe('poi.111');
+      expect(result.locality).toBeNull();
+    });
+  });
+
+  describe('searchPlaces', () => {
+    it('searches poi,place,address with proximity when coords are given', async () => {
+      mockFetchOk({ features: [MAPBOX_POI_FEATURE] });
+
+      const result = await mapboxProvider.searchPlaces('blue star', { lat: 45.52, lng: -122.68 });
+
+      const url = global.fetch.mock.calls[0][0];
+      expect(url).toContain('/mapbox.places/blue%20star.json');
+      expect(url).toContain('autocomplete=true');
+      expect(url).toContain('limit=8');
+      expect(url).toContain('country=us');
+      expect(url).toContain('types=poi,place,address');
+      expect(url).toContain('proximity=-122.68,45.52');
+
+      expect(result.places).toHaveLength(1);
+      expect(result.places[0].kind).toBe('poi');
+      expect(typeof result.places[0].distance_m).toBe('number');
+    });
+
+    it('omits proximity and returns distance_m null without coords', async () => {
+      mockFetchOk({ features: [MAPBOX_POI_FEATURE] });
+
+      const result = await mapboxProvider.searchPlaces('blue star');
+
+      const url = global.fetch.mock.calls[0][0];
+      expect(url).not.toContain('proximity=');
+      expect(result.places[0].distance_m).toBeNull();
+    });
+
+    it('throws on Mapbox failure', async () => {
+      mockFetchError(429, 'Rate limited');
+
+      await expect(mapboxProvider.searchPlaces('blue star'))
+        .rejects.toThrow('Mapbox place search failed: 429');
+    });
+
+    it('joins the split house number into the name for address features', async () => {
+      // Mapbox v5 splits "4014 Tacoma Court" into address='4014' +
+      // text='Tacoma Court' — the row name must show the full line.
+      mockFetchOk({
+        features: [{
+          id: 'address.777',
+          type: 'Feature',
+          place_type: ['address'],
+          address: '4014',
+          text: 'Tacoma Court',
+          place_name: '4014 Tacoma Court, Tacoma, Washington 98402, United States',
+          center: [-122.4443, 47.2529],
+          properties: {},
+          context: [
+            { id: 'postcode.9001', text: '98402' },
+            { id: 'place.9002', text: 'Tacoma' },
+            { id: 'region.9003', text: 'Washington', short_code: 'us-wa' },
+          ],
+        }],
+      });
+
+      const result = await mapboxProvider.searchPlaces('4014 Tacoma Court');
+
+      expect(result.places[0].name).toBe('4014 Tacoma Court');
+      expect(result.places[0].kind).toBe('address');
+    });
+  });
 });

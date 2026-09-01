@@ -31,9 +31,22 @@ const createBroadcastMessageSchema = Joi.object({
     then: Joi.required(),
     otherwise: Joi.forbidden(),
   }),
+  // Explicit place tag (Instagram-style) picked in the Beacon composer.
+  latitude: Joi.number().min(-90).max(90).optional(),
+  longitude: Joi.number().min(-180).max(180).optional(),
+  // trim() so a whitespace-only name can't satisfy the hasPlaceTag check
+  // below and write venue coords with a blank display name.
+  location_name: Joi.string().trim().max(255).allow('', null)
+    .optional(),
+  location_address: Joi.string().trim().max(500).allow('', null)
+    .optional(),
+  place_id: Joi.string().max(255).optional(),
 }).custom((value, helpers) => {
   if (!value.body && (!Array.isArray(value.media) || value.media.length === 0)) {
     return helpers.error('any.custom', { message: 'Broadcast message needs text or media.' });
+  }
+  if ((value.latitude != null) !== (value.longitude != null)) {
+    return helpers.error('any.custom', { message: 'latitude and longitude must both be provided together' });
   }
   return value;
 });
@@ -200,6 +213,10 @@ function serializeBroadcastMessage(message) {
         ? Number(message.target_tier_rank || message.post_metadata?.target_tier_rank || 1)
         : null,
       status: message.archived_at ? 'archived' : (message.post_metadata?.broadcast_status || 'published'),
+      // Explicit place tag (Beacon-profile broadcast history renders it;
+      // the personas feed reuses the Pulse projection instead).
+      location_name: message.location_name || null,
+      location_address: message.location_address || null,
       published_at: message.created_at || message.published_at || null,
       created_at: message.created_at || message.published_at || null,
       updated_at: message.updated_at || message.created_at || null,
@@ -501,6 +518,15 @@ router.post('/channels/:channelId/messages', verifyToken, broadcastPublishLimite
     const postVisibility = visibility === 'public' ? 'public' : 'followers';
     const postAudience = visibility === 'public' ? 'public' : 'followers';
     const now = new Date().toISOString();
+    // Explicit place tag: an explicitly picked venue is intentional public
+    // disclosure (like an Instagram place tag), so it may be written here.
+    // Identity-linking (home_id/target_place_id/radius_miles) and GPS
+    // attestation (gps_*) fields are NEVER written on Beacon posts — auto
+    // GPS/home context is not intentional disclosure and a Beacon must
+    // never leak the author's home or live GPS fix.
+    const hasPlaceTag = req.body.latitude != null
+      && req.body.longitude != null
+      && !!req.body.location_name;
     const { data: message, error } = await supabaseAdmin
       .from('Post')
       .insert({
@@ -517,7 +543,7 @@ router.post('/channels/:channelId/messages', verifyToken, broadcastPublishLimite
         post_format: 'standard',
         visibility: postVisibility,
         visibility_scope: 'global',
-        location_precision: 'none',
+        location_precision: hasPlaceTag ? 'approx_area' : 'none',
         tags: [],
         like_count: 0,
         comment_count: 0,
@@ -542,12 +568,19 @@ router.post('/channels/:channelId/messages', verifyToken, broadcastPublishLimite
         },
         origin: 'user',
         home_id: null,
-        latitude: null,
-        longitude: null,
-        effective_latitude: null,
-        effective_longitude: null,
-        location_name: null,
-        location_address: null,
+        latitude: hasPlaceTag ? req.body.latitude : null,
+        longitude: hasPlaceTag ? req.body.longitude : null,
+        effective_latitude: hasPlaceTag ? req.body.latitude : null,
+        effective_longitude: hasPlaceTag ? req.body.longitude : null,
+        location_name: hasPlaceTag ? req.body.location_name : null,
+        location_address: hasPlaceTag ? (req.body.location_address || null) : null,
+        ...(hasPlaceTag ? {
+          geocode_provider: 'mapbox',
+          geocode_mode: 'temporary',
+          geocode_place_id: req.body.place_id || null,
+          geocode_source_flow: 'broadcast_publish',
+          geocode_created_at: now,
+        } : {}),
         target_place_id: null,
         radius_miles: null,
         archived_at: null,

@@ -20,6 +20,7 @@ public struct PulseComposeView: View {
     @State private var viewModel: PulseComposeViewModel
     @State private var photosPickerSelection: [PhotosPickerItem] = []
     @State private var showsPhotosPicker = false
+    @State private var showsPlacePicker = false
     @Environment(\.dismiss) private var dismiss
 
     private let onPosted: @MainActor (String?) -> Void
@@ -96,6 +97,23 @@ public struct PulseComposeView: View {
         )
         .onChange(of: photosPickerSelection) { _, newItems in
             handlePicked(newItems)
+        }
+        .sheet(isPresented: $showsPlacePicker) {
+            PlacePickerSheet(
+                currentTag: viewModel.selectedPlaceTag,
+                mediaLocation: viewModel.mediaCaptureLocation,
+                onSelect: { tag in
+                    viewModel.selectPlaceTag(tag)
+                    showsPlacePicker = false
+                },
+                onRemove: {
+                    viewModel.clearPlaceTag()
+                    showsPlacePicker = false
+                },
+                onDismiss: { showsPlacePicker = false }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .overlay(alignment: .bottom) {
             if let toast = viewModel.toast {
@@ -178,7 +196,9 @@ public struct PulseComposeView: View {
             onPickPhotos: { showsPhotosPicker = true },
             onRemovePhoto: { viewModel.remove(photo: $0) },
             onBodyEditingEnded: { Task { await viewModel.runPrecheck() } },
-            onDismissPrecheckNudge: { viewModel.precheckNudge = nil }
+            onDismissPrecheckNudge: { viewModel.precheckNudge = nil },
+            onAddLocation: { showsPlacePicker = true },
+            onClearLocation: { viewModel.clearPlaceTag() }
         )
     }
 
@@ -188,7 +208,15 @@ public struct PulseComposeView: View {
             var loaded: [PulseComposePhoto] = []
             for item in items.prefix(pulseComposeMaxPhotos) {
                 if let data = try? await item.loadTransferable(type: Data.self) {
-                    loaded.append(PulseComposePhoto(data: data))
+                    // Off-main, failure-silent EXIF read. The capture
+                    // location is ONLY a local place-picker anchor —
+                    // it is never attached to the outgoing post.
+                    let capture = await MediaLocationExtractor.imageLocation(from: data)
+                    loaded.append(PulseComposePhoto(
+                        data: data,
+                        capturedLatitude: capture?.latitude,
+                        capturedLongitude: capture?.longitude
+                    ))
                 }
             }
             await MainActor.run {
@@ -221,6 +249,7 @@ public extension PulseComposeViewModel {
             isVisitorPost: isVisitorPost,
             fields: fields,
             photos: photos,
+            selectedPlaceTag: selectedPlaceTag,
             isIntentLocked: isIntentLocked,
             isFlowMode: isFlowMode,
             composePurpose: composePurpose,

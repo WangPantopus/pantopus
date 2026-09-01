@@ -151,22 +151,47 @@ public struct PublishUpdateBody: Encodable, Sendable {
     public var visibility: String
     public var targetTierRank: Int?
     public var media: [BroadcastMediaPayload]?
+    /// Explicit place tag (Instagram-style). All-or-nothing on the
+    /// backend: the location columns are only written when latitude +
+    /// longitude + location_name are all present
+    /// (`backend/routes/broadcastChannels.js` createBroadcastMessageSchema).
+    /// Nil fields are dropped from the payload — the schema is a CLOSED
+    /// Joi object but these keys are accepted; `null` is not.
+    public var latitude: Double?
+    public var longitude: Double?
+    public var locationName: String?
+    public var locationAddress: String?
+    public var placeId: String?
 
     public init(
         body: String,
         visibility: String,
         targetTierRank: Int? = nil,
-        media: [BroadcastMediaPayload]? = nil
+        media: [BroadcastMediaPayload]? = nil,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        locationName: String? = nil,
+        locationAddress: String? = nil,
+        placeId: String? = nil
     ) {
         self.body = body
         self.visibility = visibility
         self.targetTierRank = targetTierRank
         self.media = media?.isEmpty == true ? nil : media
+        self.latitude = latitude
+        self.longitude = longitude
+        self.locationName = locationName
+        self.locationAddress = locationAddress
+        self.placeId = placeId
     }
 
     enum CodingKeys: String, CodingKey {
         case body, visibility, media
         case targetTierRank = "target_tier_rank"
+        case latitude, longitude
+        case locationName = "location_name"
+        case locationAddress = "location_address"
+        case placeId = "place_id"
     }
 }
 

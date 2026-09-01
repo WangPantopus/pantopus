@@ -41,6 +41,11 @@ public final class ComposeBroadcastViewModel {
 
     public private(set) var draft: ComposeBroadcastDraft
     public private(set) var scheduledAt: Date?
+
+    /// Instagram-style place tag picked in the shared `PlacePickerSheet`.
+    /// An explicitly picked venue is intentional public disclosure; the
+    /// backend still strips all auto GPS / home context from Beacon posts.
+    public private(set) var selectedPlaceTag: PostPlaceTag?
     private var phase: Phase = .idle
     private var lastSavedDraft: ComposeBroadcastDraft
 
@@ -162,7 +167,12 @@ public final class ComposeBroadcastViewModel {
             body: trimmed,
             visibility: wire.visibility,
             targetTierRank: wire.rank,
-            media: preUploadedMedia(for: draft)
+            media: preUploadedMedia(for: draft),
+            latitude: selectedPlaceTag?.latitude,
+            longitude: selectedPlaceTag?.longitude,
+            locationName: selectedPlaceTag?.name,
+            locationAddress: selectedPlaceTag?.address,
+            placeId: selectedPlaceTag?.placeId
         )
         let response: PublishUpdateResponse = try await api.request(
             AudienceProfileEndpoints.publishUpdate(channelId: channelId, body: body)
@@ -284,9 +294,36 @@ public final class ComposeBroadcastViewModel {
         recoverFromError()
     }
 
+    public func selectPlaceTag(_ tag: PostPlaceTag) {
+        selectedPlaceTag = tag
+        recoverFromError()
+    }
+
+    public func clearPlaceTag() {
+        selectedPlaceTag = nil
+        recoverFromError()
+    }
+
     /// How many more attachments the composer will accept.
     public var remainingMediaSlots: Int {
         draft.remainingMediaSlots
+    }
+
+    /// Capture location of the first geotagged attachment — stills in
+    /// attach order first, then videos — passed to `PlacePickerSheet`
+    /// as its "Photo location" anchor. Derived from the draft's media,
+    /// so it recomputes on every add / remove. PRIVACY: a local picker
+    /// anchor ONLY — the publish body carries just the explicitly
+    /// picked venue, never this coordinate.
+    public var mediaCaptureLocation: MediaCaptureLocation? {
+        let stills = draft.media.filter { $0.kind == .image }
+        let videos = draft.media.filter { $0.kind == .video }
+        for item in stills + videos {
+            if let latitude = item.capturedLatitude, let longitude = item.capturedLongitude {
+                return MediaCaptureLocation(latitude: latitude, longitude: longitude)
+            }
+        }
+        return nil
     }
 
     public func schedule(at date: Date) {
@@ -320,6 +357,7 @@ public final class ComposeBroadcastViewModel {
             // Reset the composer but keep the chosen audience as the
             // default for the next broadcast.
             draft = ComposeBroadcastDraft(audience: snapshot.audience)
+            selectedPlaceTag = nil
             scheduledAt = nil
             lastSavedDraft = draft
             phase = .idle

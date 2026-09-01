@@ -70,3 +70,46 @@ data class GeoResolveRequest(
 data class GeoResolveResponse(
     val normalized: NormalizedAddress,
 )
+
+/**
+ * `center` on the place-tagging endpoints — a `{lat, lng}` OBJECT, unlike
+ * the legacy autocomplete's GeoJSON `[lng, lat]` array on [GeoSuggestion].
+ */
+@JsonClass(generateAdapter = true)
+data class GeoPlaceCenter(
+    val lat: Double,
+    val lng: Double,
+)
+
+/**
+ * One nearby / searched place for Instagram-style post tagging —
+ * a Mapbox POI (`kind == "poi"`) or a locality (`kind == "place"`).
+ * Wire shape from `GET /api/geo/places/nearby|search`.
+ */
+@JsonClass(generateAdapter = true)
+data class GeoPlace(
+    @Json(name = "place_id") val placeId: String? = null,
+    val name: String,
+    /** e.g. "coffee shop, cafe". */
+    val category: String? = null,
+    /** Short address line. */
+    val address: String? = null,
+    @Json(name = "full_address") val fullAddress: String? = null,
+    val center: GeoPlaceCenter,
+    val kind: String,
+    /** Meters from the query point; null when no coords were sent. */
+    @Json(name = "distance_m") val distanceM: Double? = null,
+)
+
+/** `GET /api/geo/places/nearby` envelope. */
+@JsonClass(generateAdapter = true)
+data class GeoNearbyPlacesResponse(
+    val places: List<GeoPlace> = emptyList(),
+    val locality: GeoPlace? = null,
+)
+
+/** `GET /api/geo/places/search` envelope. */
+@JsonClass(generateAdapter = true)
+data class GeoPlaceSearchResponse(
+    val places: List<GeoPlace> = emptyList(),
+)

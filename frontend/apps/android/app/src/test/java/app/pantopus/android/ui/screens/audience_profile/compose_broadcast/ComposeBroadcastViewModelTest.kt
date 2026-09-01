@@ -3,9 +3,23 @@
 package app.pantopus.android.ui.screens.audience_profile.compose_broadcast
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.api.models.audience.BroadcastChannelDto
+import app.pantopus.android.data.api.models.audience.BroadcastHistoryResponse
+import app.pantopus.android.data.api.models.audience.BroadcastMessageDto
+import app.pantopus.android.data.api.models.audience.MembershipStatsResponse
+import app.pantopus.android.data.api.models.audience.PersonaMeResponse
+import app.pantopus.android.data.api.models.audience.PersonaSummaryDto
+import app.pantopus.android.data.api.models.audience.PublishUpdateBody
+import app.pantopus.android.data.api.models.audience.PublishUpdateResponse
+import app.pantopus.android.data.api.models.posts.PostMediaUploadResponse
+import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.audience.AudienceProfileRepository
 import app.pantopus.android.data.upload.UploadRepository
+import app.pantopus.android.ui.screens.compose.placepicker.MediaCaptureLocation
+import app.pantopus.android.ui.screens.compose.placepicker.PostPlaceTag
+import io.mockk.coEvery
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -242,6 +256,175 @@ class ComposeBroadcastViewModelTest {
             assertTrue(it.replies.isNotEmpty())
         }
     }
+
+    // MARK: - Place tag
+
+    @Test
+    fun `select and clear place tag mutate the draft`() {
+        val vm = buildVm()
+        vm.selectPlaceTag(placeTag())
+        assertEquals(placeTag(), vm.state.value.draft.placeTag)
+        vm.clearPlaceTag()
+        assertNull(vm.state.value.draft.placeTag)
+    }
+
+    @Test
+    fun `publish threads the place tag onto the wire body`() =
+        runTest(dispatcher) {
+            val body = slot<PublishUpdateBody>()
+            stubPublishLegs(body)
+            val vm = buildVm()
+            vm.load()
+            advanceUntilIdle()
+            vm.updateBody("Pop-up tonight!")
+            vm.selectPlaceTag(placeTag())
+            vm.send()
+            advanceUntilIdle()
+            assertEquals(45.52, body.captured.latitude!!, 0.0)
+            assertEquals(-122.68, body.captured.longitude!!, 0.0)
+            assertEquals("Blue Bottle", body.captured.locationName)
+            assertEquals("123 Main St", body.captured.locationAddress)
+            assertEquals("poi.123", body.captured.placeId)
+            // Send resets the draft — the tag can't leak onto the next one.
+            assertNull(vm.state.value.draft.placeTag)
+        }
+
+    @Test
+    fun `publish without a place tag keeps the location keys off the wire`() =
+        runTest(dispatcher) {
+            val body = slot<PublishUpdateBody>()
+            stubPublishLegs(body)
+            val vm = buildVm()
+            vm.load()
+            advanceUntilIdle()
+            vm.updateBody("No venue this time.")
+            vm.send()
+            advanceUntilIdle()
+            assertNull(body.captured.latitude)
+            assertNull(body.captured.longitude)
+            assertNull(body.captured.locationName)
+            assertNull(body.captured.locationAddress)
+            assertNull(body.captured.placeId)
+        }
+
+    // MARK: - Media capture location (ADDENDUM 2)
+
+    @Test
+    fun `media capture location prefers stills over earlier videos`() {
+        val vm = buildVm()
+        assertNull(vm.mediaCaptureLocation)
+        vm.attachMedia(
+            ComposeMediaPreview(
+                id = "v1",
+                kind = ComposeMediaPreview.Kind.Video,
+                caption = null,
+                capturedLatitude = 10.0,
+                capturedLongitude = 20.0,
+            ),
+        )
+        vm.attachMedia(
+            ComposeMediaPreview(
+                id = "i1",
+                kind = ComposeMediaPreview.Kind.Image,
+                caption = null,
+                capturedLatitude = 41.8781,
+                capturedLongitude = -87.6298,
+            ),
+        )
+        // Stills first (in attach order), then videos — the later still
+        // outranks the earlier geotagged video.
+        assertEquals(MediaCaptureLocation(latitude = 41.8781, longitude = -87.6298), vm.mediaCaptureLocation)
+
+        // Recomputed on every remove; nil once nothing geotagged remains.
+        vm.removeMedia("i1")
+        assertEquals(MediaCaptureLocation(latitude = 10.0, longitude = 20.0), vm.mediaCaptureLocation)
+        vm.removeMedia("v1")
+        assertNull(vm.mediaCaptureLocation)
+    }
+
+    @Test
+    fun `untagged media exposes no capture location`() {
+        val vm = buildVm()
+        vm.attachMedia(ComposeMediaPreview(id = "i1", kind = ComposeMediaPreview.Kind.Image, caption = null))
+        assertNull(vm.mediaCaptureLocation)
+        // One coordinate alone is not a usable anchor.
+        vm.attachMedia(
+            ComposeMediaPreview(
+                id = "i2",
+                kind = ComposeMediaPreview.Kind.Image,
+                caption = null,
+                capturedLatitude = 41.8781,
+            ),
+        )
+        assertNull(vm.mediaCaptureLocation)
+    }
+
+    @Test
+    fun `media capture location never rides the publish body`() =
+        runTest(dispatcher) {
+            // PRIVACY RULE — media GPS is a local picker anchor only; the
+            // wire body carries location keys only for an explicit pick.
+            val body = slot<PublishUpdateBody>()
+            stubPublishLegs(body)
+            val vm = buildVm()
+            vm.load()
+            advanceUntilIdle()
+            vm.updateBody("Geotagged photo attached.")
+            vm.attachMedia(
+                ComposeMediaPreview(
+                    id = "i1",
+                    kind = ComposeMediaPreview.Kind.Image,
+                    caption = null,
+                    bytes = byteArrayOf(1),
+                    capturedLatitude = 41.8781,
+                    capturedLongitude = -87.6298,
+                ),
+            )
+            coEvery { uploadRepository.uploadPostMediaFiles(any(), any()) } returns
+                NetworkResult.Success(
+                    PostMediaUploadResponse(
+                        message = "ok",
+                        mediaUrls = emptyList(),
+                        mediaTypes = emptyList(),
+                        mediaThumbnails = emptyList(),
+                        mediaLiveUrls = emptyList(),
+                    ),
+                )
+            vm.send()
+            advanceUntilIdle()
+            assertNull(body.captured.latitude)
+            assertNull(body.captured.longitude)
+            assertNull(body.captured.locationName)
+            assertNull(body.captured.locationAddress)
+            assertNull(body.captured.placeId)
+        }
+
+    /** Wire up the four legs `load()` + `realPublish` touch. */
+    private fun stubPublishLegs(body: io.mockk.CapturingSlot<PublishUpdateBody>) {
+        coEvery { repository.me() } returns
+            NetworkResult.Success(
+                PersonaMeResponse(
+                    persona = PersonaSummaryDto(id = "p1", handle = "chef"),
+                    channel = BroadcastChannelDto(id = "ch1"),
+                ),
+            )
+        coEvery { repository.membershipStats("p1") } returns
+            NetworkResult.Success(MembershipStatsResponse())
+        coEvery { repository.broadcastHistory("ch1") } returns
+            NetworkResult.Success(BroadcastHistoryResponse())
+        coEvery { repository.publishUpdate("ch1", capture(body)) } returns
+            NetworkResult.Success(PublishUpdateResponse(message = BroadcastMessageDto(id = "m1")))
+    }
+
+    private fun placeTag(): PostPlaceTag =
+        PostPlaceTag(
+            name = "Blue Bottle",
+            address = "123 Main St",
+            latitude = 45.52,
+            longitude = -122.68,
+            placeId = "poi.123",
+            kind = "poi",
+        )
 }
 
 private class SendFailure(message: String) : RuntimeException(message)

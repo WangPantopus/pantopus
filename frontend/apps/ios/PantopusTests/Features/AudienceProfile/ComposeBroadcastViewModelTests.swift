@@ -105,6 +105,106 @@ final class ComposeBroadcastViewModelTests: XCTestCase {
         XCTAssertEqual(vm.reach(for: .bronzePlus), 518)
     }
 
+    // MARK: - Place tag
+
+    private static let placeTag = PostPlaceTag(
+        name: "Joe's Coffee",
+        address: "123 Elm St",
+        latitude: 45.521,
+        longitude: -122.681,
+        placeId: "poi.1",
+        kind: "poi"
+    )
+
+    func testSelectPlaceTagStoredAndClearedAfterSend() async {
+        let vm = makeVM()
+        vm.selectPlaceTag(Self.placeTag)
+        XCTAssertEqual(vm.selectedPlaceTag?.name, "Joe's Coffee")
+        vm.updateBody("Fresh loaves at the stand today")
+        await vm.send()
+        XCTAssertNil(vm.selectedPlaceTag, "tag resets with the draft after a successful send")
+    }
+
+    func testClearPlaceTagRemovesSelection() {
+        let vm = makeVM()
+        vm.selectPlaceTag(Self.placeTag)
+        vm.clearPlaceTag()
+        XCTAssertNil(vm.selectedPlaceTag)
+    }
+
+    // MARK: - Media capture location (ADDENDUM 2)
+
+    func testMediaCaptureLocationPrefersStillsOverVideosAndRecomputes() {
+        let vm = makeVM()
+        XCTAssertNil(vm.mediaCaptureLocation)
+
+        // Video-only → the video's capture point anchors.
+        vm.attachMedia(ComposeMediaPreview(
+            id: "v1",
+            kind: .video,
+            caption: nil,
+            capturedLatitude: 30.2672,
+            capturedLongitude: -97.7431
+        ))
+        XCTAssertEqual(vm.mediaCaptureLocation?.latitude ?? 0, 30.2672, accuracy: 0.0001)
+
+        // A geotagged STILL wins over the earlier-attached video.
+        vm.attachMedia(ComposeMediaPreview(
+            id: "i1",
+            kind: .image,
+            caption: nil,
+            capturedLatitude: 41.8781,
+            capturedLongitude: -87.6298
+        ))
+        XCTAssertEqual(vm.mediaCaptureLocation?.latitude ?? 0, 41.8781, accuracy: 0.0001)
+        XCTAssertEqual(vm.mediaCaptureLocation?.longitude ?? 0, -87.6298, accuracy: 0.0001)
+
+        // Removing the still falls back to the video; clearing all clears.
+        vm.removeMedia(id: "i1")
+        XCTAssertEqual(vm.mediaCaptureLocation?.latitude ?? 0, 30.2672, accuracy: 0.0001)
+        vm.removeMedia()
+        XCTAssertNil(vm.mediaCaptureLocation)
+    }
+
+    func testUntaggedMediaExposesNoCaptureLocation() {
+        let vm = makeVM()
+        vm.attachMedia(ComposeMediaPreview(kind: .image, caption: nil))
+        vm.attachMedia(ComposeMediaPreview(kind: .video, caption: nil))
+        XCTAssertNil(vm.mediaCaptureLocation, "no geotag → no anchor chips")
+    }
+
+    /// Wire contract for B5 — snake_case keys, nils dropped (the
+    /// broadcast schema is a CLOSED Joi object that rejects `null`s).
+    func testPublishBodyEncodesPlaceTagSnakeCaseAndDropsNils() throws {
+        let tagged = PublishUpdateBody(
+            body: "Fresh loaves",
+            visibility: "public",
+            latitude: 45.521,
+            longitude: -122.681,
+            locationName: "Joe's Coffee",
+            locationAddress: "123 Elm St",
+            placeId: "poi.1"
+        )
+        let json = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(tagged)
+        ) as? [String: Any]
+        XCTAssertEqual(json?["location_name"] as? String, "Joe's Coffee")
+        XCTAssertEqual(json?["location_address"] as? String, "123 Elm St")
+        XCTAssertEqual(json?["place_id"] as? String, "poi.1")
+        XCTAssertEqual(json?["latitude"] as? Double ?? 0, 45.521, accuracy: 0.0001)
+        XCTAssertEqual(json?["longitude"] as? Double ?? 0, -122.681, accuracy: 0.0001)
+
+        let untagged = PublishUpdateBody(body: "Fresh loaves", visibility: "public")
+        let bare = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(untagged)
+        ) as? [String: Any]
+        XCTAssertNil(bare?["location_name"])
+        XCTAssertNil(bare?["location_address"])
+        XCTAssertNil(bare?["place_id"])
+        XCTAssertNil(bare?["latitude"])
+        XCTAssertNil(bare?["longitude"])
+    }
+
     func testScheduleAndSendNowToggleState() {
         let vm = makeVM()
         vm.updateBody("Loaf drop at 4")

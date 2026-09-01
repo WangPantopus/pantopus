@@ -28,6 +28,8 @@ import app.pantopus.android.data.posts.PostPrecheckRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import app.pantopus.android.data.upload.UploadRepository
+import app.pantopus.android.ui.screens.compose.placepicker.MediaCaptureLocation
+import app.pantopus.android.ui.screens.compose.placepicker.PostPlaceTag
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.shared.form.FormAggregate
 import app.pantopus.android.ui.screens.shared.form.FormFieldState
@@ -167,10 +169,18 @@ enum class PulseAskCategory(val key: String, val label: String) {
     Other("other", "Other"),
 }
 
-/** One picked photo. Carries the bytes + a stable id for ForEach. */
+/**
+ * One picked photo. Carries the bytes + a stable id for ForEach.
+ * [capturedLatitude]/[capturedLongitude] are the EXIF capture
+ * coordinates extracted at pick time (mirrors the iOS
+ * `PulseComposePhoto` fields) — a LOCAL place-picker anchor input only,
+ * never attached to the outgoing post body.
+ */
 data class PulseComposePhoto(
     val id: String,
     val data: ByteArray,
+    val capturedLatitude: Double? = null,
+    val capturedLongitude: Double? = null,
 ) {
     override fun equals(other: Any?): Boolean = other is PulseComposePhoto && other.id == id
 
@@ -332,6 +342,10 @@ class PulseComposeViewModel
 
         private val _photos = MutableStateFlow<List<PulseComposePhoto>>(emptyList())
         val photos: StateFlow<List<PulseComposePhoto>> = _photos.asStateFlow()
+
+        /** Instagram-style venue tag picked in the PlacePickerSheet. */
+        private val _selectedPlaceTag = MutableStateFlow<PostPlaceTag?>(null)
+        val selectedPlaceTag: StateFlow<PostPlaceTag?> = _selectedPlaceTag.asStateFlow()
 
         private val _toast = MutableStateFlow<PulseComposeToast?>(null)
         val toast: StateFlow<PulseComposeToast?> = _toast.asStateFlow()
@@ -509,6 +523,14 @@ class PulseComposeViewModel
             _recommendRating.value = rating.coerceIn(1, 5)
         }
 
+        fun selectPlaceTag(tag: PostPlaceTag) {
+            _selectedPlaceTag.value = tag
+        }
+
+        fun clearPlaceTag() {
+            _selectedPlaceTag.value = null
+        }
+
         fun update(
             field: PulseComposeField,
             value: String,
@@ -579,6 +601,22 @@ class PulseComposeViewModel
                 }
         }
 
+        /**
+         * ADDENDUM 2 — capture location of the first geotagged attachment
+         * (in attach order), recomputed on every photo add/remove and nil
+         * when nothing is geotagged. Seeds the PlacePickerSheet's "Photo
+         * location" anchor. PRIVACY: a local anchor input only — it is
+         * NEVER written onto the outgoing request (the post carries only
+         * an explicitly picked venue).
+         */
+        val mediaCaptureLocation: MediaCaptureLocation?
+            get() =
+                _photos.value.firstNotNullOfOrNull { photo ->
+                    val lat = photo.capturedLatitude
+                    val lng = photo.capturedLongitude
+                    if (lat != null && lng != null) MediaCaptureLocation(latitude = lat, longitude = lng) else null
+                }
+
         fun setPhotos(photos: List<PulseComposePhoto>) {
             _photos.value = photos.take(PULSE_COMPOSE_MAX_PHOTOS)
         }
@@ -605,6 +643,10 @@ class PulseComposeViewModel
         val isDirty: Boolean
             get() {
                 if (_photos.value.isNotEmpty()) return true
+                // Place tags are create-only (buildUpdateRequest has no
+                // location fields) — mirror iOS: dirty in create mode,
+                // never a no-op-Save enabler in edit mode.
+                if (!isEditing && _selectedPlaceTag.value != null) return true
                 if (_identity.value != baselineIdentity) return true
                 if (_visibility.value != baselineVisibility) return true
                 if (activeIntentFields().any { (_fields.value[it]?.isDirty == true) }) return true
@@ -1208,7 +1250,7 @@ class PulseComposeViewModel
                         )
                     }
                 }
-            return mergeTargetContext(base)
+            return applyPlaceTag(mergeTargetContext(base))
         }
 
         private fun effectivePostType(): String {
@@ -1266,6 +1308,26 @@ class PulseComposeViewModel
                 gpsTimestamp = gps.timestamp,
                 gpsLatitude = gps.latitude,
                 gpsLongitude = gps.longitude,
+            )
+        }
+
+        /**
+         * Instagram-style venue tag — applied as the LAST build step so an
+         * explicit pick wins over the flow-target context
+         * ([mergeTargetContext] overwrites location fields wholesale). The
+         * `gps*` attestation fields are deliberately untouched: they attest
+         * the device fix, not the tagged venue.
+         */
+        private fun applyPlaceTag(request: PostCreateRequest): PostCreateRequest {
+            val tag = _selectedPlaceTag.value ?: return request
+            return request.copy(
+                latitude = tag.latitude,
+                longitude = tag.longitude,
+                locationName = tag.name,
+                locationAddress = tag.address,
+                geocodeProvider = "mapbox",
+                geocodeAccuracy = tag.kind,
+                geocodePlaceId = tag.placeId,
             )
         }
 

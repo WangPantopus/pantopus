@@ -99,11 +99,64 @@ function featureToNormalized(f, source, mode) {
  */
 function featureKind(f) {
   const types = f.place_type || [];
+  if (types.includes('poi')) return 'poi';
   if (types.includes('address')) return 'address';
   if (types.includes('place')) return 'place';
   if (types.includes('locality')) return 'locality';
   if (types.includes('postcode')) return 'postcode';
   return types[0] || 'unknown';
+}
+
+/**
+ * Great-circle distance between two coordinates, in meters.
+ */
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const earthRadiusM = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * earthRadiusM * Math.asin(Math.sqrt(a));
+}
+
+/**
+ * Parse a Mapbox v5 feature into a NormalizedPlace (place-tagging wire
+ * shape). distance_m is filled only when the query point is known.
+ */
+function featureToPlace(f, queryLat, queryLng) {
+  const center = f.center
+    ? { lat: f.center[1], lng: f.center[0] }
+    : { lat: 0, lng: 0 };
+  const hasQueryPoint = Number.isFinite(queryLat) && Number.isFinite(queryLng);
+
+  return {
+    place_id: f.id || null,
+    // featureAddressLine re-joins the house number Mapbox v5 splits into
+    // `f.address` for address-kind features ("4014" + "Tacoma Court"),
+    // and falls back to the first place_name segment.
+    name: featureAddressLine(f),
+    category: f.properties?.category || null,
+    address: f.properties?.address || secondaryText(f) || null,
+    full_address: f.place_name || null,
+    center,
+    kind: featureKind(f),
+    distance_m: hasQueryPoint && f.center
+      ? Math.round(haversineMeters(queryLat, queryLng, center.lat, center.lng))
+      : null,
+  };
+}
+
+/**
+ * True when a Mapbox feature carries a usable [lng, lat] center. Features
+ * without one are dropped rather than defaulting to Null Island {0,0} —
+ * a picked place's coordinates get persisted onto the post.
+ */
+function hasCenter(f) {
+  return Array.isArray(f.center)
+    && f.center.length >= 2
+    && Number.isFinite(f.center[0])
+    && Number.isFinite(f.center[1]);
 }
 
 /**
@@ -269,6 +322,96 @@ const mapboxProvider = {
     if (!f) throw new Error('No result for address');
 
     return featureToNormalized(f, 'mapbox_geocode', mode);
+  },
+
+  /**
+   * Named places (POIs) around a coordinate, plus the enclosing locality —
+   * powers the Instagram-style place-tag picker.
+   *
+   * @param {number} lat
+   * @param {number} lng
+   * @param {{ limit?: number }} [options]
+   * @returns {Promise<{ places: object[], locality: object|null }>}
+   */
+  async nearbyPlaces(lat, lng, options = {}) {
+    const { limit = 10 } = options;
+    const token = requireToken();
+
+    const base =
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(lng)},${encodeURIComponent(lat)}.json` +
+      `?access_token=${encodeURIComponent(token)}`;
+
+    // Reverse geocoding only honors limit > 1 with a single `types` value,
+    // so POIs and the locality come from two parallel calls.
+    const [poiRes, localityRes] = await Promise.all([
+      fetch(`${base}&types=poi&limit=${limit}`),
+      fetch(`${base}&types=place&limit=1`),
+    ]);
+
+    if (!poiRes.ok) {
+      const text = await poiRes.text();
+      logger.warn('mapbox_nearby_places_error', { status: poiRes.status, body: text });
+      throw new Error(`Mapbox nearby places failed: ${poiRes.status}`);
+    }
+
+    // The locality row is decorative (the contract allows locality: null),
+    // so its call failing must not throw away a successful POI response.
+    let localityData = { features: [] };
+    if (localityRes.ok) {
+      localityData = await localityRes.json();
+    } else {
+      const text = await localityRes.text();
+      logger.warn('mapbox_nearby_locality_error', { status: localityRes.status, body: text });
+    }
+
+    const poiData = await poiRes.json();
+    const places = (poiData.features || [])
+      .filter(hasCenter)
+      .map((f) => featureToPlace(f, lat, lng));
+    const localityFeature = (localityData.features || []).find(hasCenter);
+    const locality = localityFeature ? featureToPlace(localityFeature, lat, lng) : null;
+
+    return { places, locality };
+  },
+
+  /**
+   * Autocomplete search over POIs, places, and addresses for the place-tag
+   * picker; proximity-biased when the caller's coordinates are known.
+   *
+   * @param {string} query
+   * @param {{ lat?: number, lng?: number, limit?: number }} [options]
+   * @returns {Promise<{ places: object[] }>}
+   */
+  async searchPlaces(query, options = {}) {
+    const { lat, lng, limit = 8 } = options;
+    const token = requireToken();
+
+    let url =
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json` +
+      `?access_token=${encodeURIComponent(token)}` +
+      `&autocomplete=true&limit=${limit}&country=us&types=poi,place,address`;
+    const hasProximity = Number.isFinite(lat) && Number.isFinite(lng);
+    if (hasProximity) {
+      url += `&proximity=${encodeURIComponent(lng)},${encodeURIComponent(lat)}`;
+    }
+
+    const r = await fetch(url);
+    if (!r.ok) {
+      const text = await r.text();
+      logger.warn('mapbox_search_places_error', { status: r.status, body: text });
+      throw new Error(`Mapbox place search failed: ${r.status}`);
+    }
+
+    const data = await r.json();
+    const places = (data.features || [])
+      .filter(hasCenter)
+      .map((f) => featureToPlace(
+        f,
+        hasProximity ? lat : NaN,
+        hasProximity ? lng : NaN,
+      ));
+
+    return { places };
   },
 };
 
