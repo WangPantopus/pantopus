@@ -199,22 +199,39 @@ The Android emulator cannot reach `localhost` — that points at the emulator it
 
 ## Push notifications
 
-The `POST /api/notifications/register` endpoint takes `{token, platform}` — the app should register with `platform: "android"` and an FCM token. FCM wiring (Firebase `google-services.json` + the `com.google.gms.google-services` plugin) is **not** included in this scaffold yet; add it when ready. Backend-side, see [`docs/push-native-migration.md`](../../../docs/push-native-migration.md) for the plan to migrate from Expo's push infrastructure to direct FCM + APNs.
+FCM is wired in code. The `com.google.gms.google-services` plugin is applied in [`app/build.gradle.kts`](app/build.gradle.kts), and [`PantopusMessagingService`](app/src/main/java/app/pantopus/android/push/PantopusMessagingService.kt) is registered for `com.google.firebase.MESSAGING_EVENT` in the manifest. It handles token rotation (`onNewToken` → `POST /api/notifications/register` with `{token, platform: "android"}`) and incoming payloads (`onMessageReceived` → `NotificationDispatcher`).
+
+The one thing still missing is the real credential. `app/google-services.json` is a committed **placeholder** — stub values that satisfy the Gradle plugin so builds compile, marked with a `_TODO` key at the top of the file. Until it's replaced, FCM will not deliver messages.
+
+To finish the setup, download the real `google-services.json` from the [Firebase console](https://console.firebase.google.com/) (Project Settings → General → "Your apps") and drop it in at `app/google-services.json`, replacing the placeholder. Register **both** application IDs in the Firebase project, or debug builds won't receive pushes:
+
+| Variant | Application ID              |
+|---------|-----------------------------|
+| Release | `app.pantopus.android`      |
+| Debug   | `app.pantopus.android.debug`|
+
+Backend-side, see [`docs/push-native-migration.md`](../../../docs/push-native-migration.md) for the plan to migrate from Expo's push infrastructure to direct FCM + APNs.
 
 ## Release signing
 
-Don't commit your keystore. The recommended flow:
+Don't commit your keystore. The `signingConfigs { release { … } }` block already exists in [`app/build.gradle.kts`](app/build.gradle.kts) — you only need to supply the credentials:
 
 1. Generate a keystore: `keytool -genkey -v -keystore pantopus.jks -keyalg RSA -keysize 2048 -validity 10000 -alias pantopus`.
-2. Put the path + passwords in `~/.gradle/gradle.properties`:
+2. Put the path + passwords in `frontend/apps/android/.env` (the same file you copied from `.env.example`, which is gitignored and already documents these four keys):
    ```
    PANTOPUS_KEYSTORE_FILE=/absolute/path/to/pantopus.jks
    PANTOPUS_KEYSTORE_PASSWORD=...
    PANTOPUS_KEY_ALIAS=pantopus
    PANTOPUS_KEY_PASSWORD=...
    ```
-3. Wire a `signingConfigs { release { … } }` block into `app/build.gradle.kts` that reads those properties and attach it to `buildTypes.release`.
-4. `./gradlew bundleRelease` produces a signed AAB.
+   Real environment variables work too — the build's `envOr` helper reads `.env` first, then `System.getenv`. It does **not** read `~/.gradle/gradle.properties`; values placed there are silently ignored.
+3. `./gradlew bundleRelease` produces a signed AAB.
+
+> **Check your release build is actually signed.** The `release` signing config is only created when `PANTOPUS_KEYSTORE_FILE` is set *and* the file exists at that path. Otherwise the release build silently falls back to the **debug** keystore (`signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")`) so smoke-test builds still work. A typo'd path produces an artifact that looks fine but is debug-signed and will be rejected by the Play Store. Verify with:
+>
+> ```bash
+> keytool -printcert -jarfile app/build/outputs/bundle/release/app-release.aab
+> ```
 
 For automated Play Store uploads, add the [Gradle Play Publisher](https://github.com/Triple-T/gradle-play-publisher) plugin and a service account JSON (also not committed).
 
