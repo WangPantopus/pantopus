@@ -112,3 +112,73 @@ describe('ending residency retires outstanding letters', () => {
     expect(getTable('ResidencyLetter')[0].status).toBe('issued');
   });
 });
+
+describe('a stale verification cannot mint a fresh letter (flag-gated)', () => {
+  // The issue route's gate, tested through the same helper it uses.
+  const express = require('express');
+  const request = require('supertest');
+  const flags = require('../../utils/addressRolloutFlags');
+  const verificationAge = require('../../utils/verificationAge');
+  const { checkHomePermission } = require('../../utils/homePermissions');
+
+  jest.mock('../../utils/homePermissions', () => ({
+    checkHomePermission: jest.fn(),
+    isVerifiedOwner: jest.fn().mockResolvedValue({ isOwner: false }),
+    mapLegacyRole: jest.fn((r) => r),
+    writeAuditLog: jest.fn().mockResolvedValue(undefined),
+  }));
+
+  const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
+
+  function appWithRoutes() {
+    const app = express();
+    app.use(express.json());
+    app.use('/api/homes', require('../../routes/residencyLetters'));
+    return app;
+  }
+
+  afterEach(() => flags.__setOverrides(null));
+  afterAll(() => flags.stopRolloutFlagRefresh());
+
+  function occupancyVerifiedAt(verifiedAt) {
+    checkHomePermission.mockResolvedValue({
+      hasAccess: true,
+      isOwner: false,
+      occupancy: { verification_status: 'verified', verified_at: verifiedAt },
+    });
+  }
+
+  test('stale + flag on → VERIFICATION_REQUIRED, no letter row', async () => {
+    flags.__setOverrides({ enforceVerificationExpiry: true });
+    occupancyVerifiedAt(daysAgo(verificationAge.validityDays() + 10));
+
+    const res = await request(appWithRoutes())
+      .post('/api/homes/home-lttr-1/residency-letters')
+      .send({ purpose: 'lease' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('VERIFICATION_REQUIRED');
+  });
+
+  test('stale + flag off → still issues (measurement without policy)', async () => {
+    flags.__setOverrides({ enforceVerificationExpiry: false });
+    occupancyVerifiedAt(daysAgo(verificationAge.validityDays() + 10));
+
+    const res = await request(appWithRoutes())
+      .post('/api/homes/home-lttr-1/residency-letters')
+      .send({ purpose: 'lease' });
+
+    expect(res.status).not.toBe(403);
+  });
+
+  test('fresh + flag on → issues', async () => {
+    flags.__setOverrides({ enforceVerificationExpiry: true });
+    occupancyVerifiedAt(daysAgo(2));
+
+    const res = await request(appWithRoutes())
+      .post('/api/homes/home-lttr-1/residency-letters')
+      .send({ purpose: 'lease' });
+
+    expect(res.status).not.toBe(403);
+  });
+});

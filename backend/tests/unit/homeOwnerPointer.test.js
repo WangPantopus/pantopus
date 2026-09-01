@@ -308,3 +308,54 @@ describe('MISSING_UNIT with the no-unit attestation', () => {
     expect(getTable('Home')).toHaveLength(0);
   });
 });
+
+describe('coordinate provenance at create', () => {
+  test('client-supplied coordinates are stamped user_asserted, never verified', async () => {
+    // canonical_address is null, so `coords` falls back to the body's pin.
+    const app = createApp();
+    const res = await request(app).post('/api/homes').send(CREATE_BODY);
+    expect(res.status).toBe(201);
+
+    const home = getTable('Home').find((h) => h.created_by_user_id === TEST_USER);
+    // A fake 'verified' stamp here would make shouldBlockCoordinateOverwrite
+    // protect the attacker's pin from later correction.
+    expect(home.geocode_mode).toBe('user_asserted');
+    expect(home.geocode_provider).toBe('client');
+  });
+
+  test('the request body cannot name its own geocode provenance', async () => {
+    const app = createApp();
+    const res = await request(app).post('/api/homes').send({
+      ...CREATE_BODY,
+      geocode_provider: 'google_validation',
+      geocode_accuracy: 'rooftop',
+    });
+    expect(res.status).toBe(201);
+
+    const home = getTable('Home').find((h) => h.created_by_user_id === TEST_USER);
+    expect(home.geocode_mode).toBe('user_asserted');
+    expect(home.geocode_provider).toBe('client');
+    expect(home.geocode_accuracy).toBeNull();
+  });
+
+  test('pipeline-produced coordinates are stamped verified', async () => {
+    pipelineService.runValidationPipeline.mockResolvedValue({
+      verdict: { status: 'OK', confidence: 1.0, reasons: [] },
+      canonical_address: {
+        id: '77777777-7777-4777-8777-777777777777',
+        geocode_lat: 45.52,
+        geocode_lng: -122.68,
+        address_hash: 'canonicalhash',
+      },
+      address_id: '77777777-7777-4777-8777-777777777777',
+    });
+    const app = createApp();
+    const res = await request(app).post('/api/homes').send(CREATE_BODY);
+    expect(res.status).toBe(201);
+
+    const home = getTable('Home').find((h) => h.created_by_user_id === TEST_USER);
+    expect(home.geocode_mode).toBe('verified');
+    expect(home.geocode_provider).toBe('google_validation');
+    expect(home.map_center_lat).toBe(45.52);
+  });
+});

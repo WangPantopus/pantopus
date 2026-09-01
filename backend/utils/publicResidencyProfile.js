@@ -32,6 +32,7 @@ async function getPublicResidencySummary(userId, viewerId = null) {
       .from('HomeOccupancy')
       .select(`
         verification_status,
+        verified_at,
         created_at,
         home:home_id ( id, city, state )
       `)
@@ -43,7 +44,13 @@ async function getPublicResidencySummary(userId, viewerId = null) {
     if (occ && occ.home) {
       const home = occ.home;
       const homeId = home.id;
-      let verified = occ.verification_status === 'verified';
+      // The public "verified resident" badge respects expiry when enforcement
+      // is on: a verification past its validity window stops being presented
+      // to strangers as current. Legacy rows without verified_at never demote.
+      // eslint-disable-next-line global-require
+      const verificationAge = require('./verificationAge');
+      let verified = occ.verification_status === 'verified'
+        && !verificationAge.staleAffectsTrust(occ.verified_at);
       if (!verified) {
         const ownerCheck = await isVerifiedOwner(homeId, userId);
         verified = ownerCheck.isOwner;

@@ -1185,16 +1185,28 @@ router.post('/', verifyToken, (req, res, next) => {
         : {}),
     };
 
-    // Add location if provided
+    // Add location if provided.
+    //
+    // Provenance is decided by where the coordinates actually came from, not
+    // by what the request claims. This used to stamp geocode_mode 'verified'
+    // (with a body-controlled provider and accuracy) even when `coords` fell
+    // back to the client's own latitude/longitude — and because
+    // shouldBlockCoordinateOverwrite protects 'verified' rows from later
+    // correction, the fake stamp locked the self-asserted pin in. A
+    // client-supplied pin is 'user_asserted', exactly as PATCH records it,
+    // and the reverse-geocode job (Home.coordinate_validation, migration 191)
+    // is the backstop that checks it against the address.
+    const coordsAreCanonical = !!(canonicalAddress
+      && Number.isFinite(canonicalAddress.geocode_lat)
+      && Number.isFinite(canonicalAddress.geocode_lng));
     if (coords && Number.isFinite(coords.latitude) && Number.isFinite(coords.longitude)) {
       homeData.location = formatLocationForDB(coords.latitude, coords.longitude);
       homeData.map_center_lat = coords.latitude;
       homeData.map_center_lng = coords.longitude;
-      // Geocode provenance
-      homeData.geocode_provider = req.body.geocode_provider || 'google_validation';
-      homeData.geocode_mode = 'verified';
-      homeData.geocode_accuracy = req.body.geocode_accuracy || 'rooftop';
-      homeData.geocode_place_id = req.body.geocode_place_id || null;
+      homeData.geocode_provider = coordsAreCanonical ? 'google_validation' : 'client';
+      homeData.geocode_mode = coordsAreCanonical ? 'verified' : 'user_asserted';
+      homeData.geocode_accuracy = coordsAreCanonical ? 'rooftop' : null;
+      homeData.geocode_place_id = coordsAreCanonical ? (req.body.geocode_place_id || null) : null;
       homeData.geocode_source_flow = 'home_onboarding';
       homeData.geocode_created_at = new Date().toISOString();
     }
@@ -1265,10 +1277,12 @@ router.post('/', verifyToken, (req, res, next) => {
             geocode_lat: coords?.latitude || null,
             geocode_lng: coords?.longitude || null,
             place_type: normalizedLine2 ? 'unit' : 'single_family',
-            geocode_provider: req.body.geocode_provider || 'google_validation',
-            geocode_mode: 'verified',
-            geocode_accuracy: req.body.geocode_accuracy || 'rooftop',
-            geocode_place_id: req.body.geocode_place_id || null,
+            // Same provenance rule as the Home row above: 'verified' only when
+            // the pipeline produced these coordinates.
+            geocode_provider: coordsAreCanonical ? 'google_validation' : 'client',
+            geocode_mode: coordsAreCanonical ? 'verified' : 'user_asserted',
+            geocode_accuracy: coordsAreCanonical ? 'rooftop' : null,
+            geocode_place_id: coordsAreCanonical ? (req.body.geocode_place_id || null) : null,
             geocode_source_flow: 'home_onboarding',
             geocode_created_at: new Date().toISOString(),
           })

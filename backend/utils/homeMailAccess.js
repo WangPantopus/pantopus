@@ -53,7 +53,7 @@ async function getAccessibleHomeIds(userId) {
 
   const { data, error } = await supabaseAdmin
     .from('HomeOccupancy')
-    .select('home_id')
+    .select('home_id, verification_status, verified_at')
     .eq('user_id', userId)
     .eq('is_active', true)
     .in('verification_status', MAIL_TRUSTED_VERIFICATION_STATUSES);
@@ -63,7 +63,19 @@ async function getAccessibleHomeIds(userId) {
     return [];
   }
 
-  return [...new Set((data || []).map((r) => r.home_id).filter(Boolean))];
+  // Expiry (behind address.enforce_verification_expiry): a 'verified' row past
+  // its validity window loses this surface until re-verified — mail is the
+  // continuous, high-sensitivity read that a years-old verification should not
+  // keep open. Only 'verified' rows are age-checked: the provisional states
+  // are pre-verification and have no verification to age, and rows with no
+  // verified_at predate the column and are never demoted.
+  // eslint-disable-next-line global-require
+  const verificationAge = require('./verificationAge');
+  const trusted = (data || []).filter((r) => (
+    r.verification_status !== 'verified' || !verificationAge.staleAffectsTrust(r.verified_at)
+  ));
+
+  return [...new Set(trusted.map((r) => r.home_id).filter(Boolean))];
 }
 
 module.exports = { getAccessibleHomeIds };

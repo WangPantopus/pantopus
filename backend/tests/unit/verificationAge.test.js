@@ -78,3 +78,54 @@ describe('describe()', () => {
     expect(out.enforced).toBe(false);
   });
 });
+
+describe('enforcement has read sites (the flag changes real behaviour)', () => {
+  const { seedTable } = require('../__mocks__/supabaseAdmin');
+  const { getAccessibleHomeIds } = require('../../utils/homeMailAccess');
+
+  function seedOccupancy(verifiedAt) {
+    seedTable('HomeOccupancy', [{
+      id: 'occ-age-1',
+      home_id: 'home-age-1',
+      user_id: 'user-age-1',
+      is_active: true,
+      verification_status: 'verified',
+      verified_at: verifiedAt,
+    }]);
+  }
+
+  test('mail access: a stale verification loses the surface when the flag is on', async () => {
+    seedOccupancy(daysAgo(verificationAge.validityDays() + 30));
+
+    flags.__setOverrides({ enforceVerificationExpiry: false });
+    expect(await getAccessibleHomeIds('user-age-1')).toEqual(['home-age-1']);
+
+    flags.__setOverrides({ enforceVerificationExpiry: true });
+    expect(await getAccessibleHomeIds('user-age-1')).toEqual([]);
+  });
+
+  test('mail access: a fresh verification is unaffected by the flag', async () => {
+    seedOccupancy(daysAgo(3));
+    flags.__setOverrides({ enforceVerificationExpiry: true });
+    expect(await getAccessibleHomeIds('user-age-1')).toEqual(['home-age-1']);
+  });
+
+  test('mail access: a legacy row with no verified_at is never demoted', async () => {
+    seedOccupancy(null);
+    flags.__setOverrides({ enforceVerificationExpiry: true });
+    expect(await getAccessibleHomeIds('user-age-1')).toEqual(['home-age-1']);
+  });
+
+  test('mail access: provisional_bootstrap has no verification to age', async () => {
+    seedTable('HomeOccupancy', [{
+      id: 'occ-age-2',
+      home_id: 'home-age-2',
+      user_id: 'user-age-1',
+      is_active: true,
+      verification_status: 'provisional_bootstrap',
+      verified_at: null,
+    }]);
+    flags.__setOverrides({ enforceVerificationExpiry: true });
+    expect(await getAccessibleHomeIds('user-age-1')).toEqual(['home-age-2']);
+  });
+});
