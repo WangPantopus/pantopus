@@ -1,4 +1,4 @@
--- Migration 160: Remove plaintext verification codes from MailVerificationJob
+-- Migration 185: Remove plaintext verification codes from MailVerificationJob
 --
 -- SECURITY. `startVerification` used to write the plaintext mail-verification
 -- code into `MailVerificationJob.metadata` alongside the SHA-256 `code_hash`

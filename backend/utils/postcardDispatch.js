@@ -24,7 +24,7 @@ function generatePostcardCode() {
   return String(crypto.randomInt(100000, 1000000));
 }
 
-/** SHA-256 of a postcard code. Only the hash is ever persisted (migration 162). */
+/** SHA-256 of a postcard code. Only the hash is ever persisted (migration 187). */
 function hashPostcardCode(code) {
   return crypto.createHash('sha256').update(String(code).toUpperCase()).digest('hex');
 }

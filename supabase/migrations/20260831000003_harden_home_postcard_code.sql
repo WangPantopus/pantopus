@@ -1,4 +1,4 @@
--- Migration 162: Harden HomePostcardCode (legacy postcard verification)
+-- Migration 187: Harden HomePostcardCode (legacy postcard verification)
 --
 -- SECURITY. The legacy postcard path used by the iOS and Android clients had
 -- four defects, all in one small table:
@@ -12,6 +12,12 @@
 -- The application now generates codes with crypto.randomInt and stores only a
 -- SHA-256 hash. This migration adds the hash column, retires the cleartext
 -- column, and puts the table behind RLS.
+--
+-- DEPLOY ORDER: this migration and the code change must land together. The old
+-- code writes the NOT NULL "code" column this drops; the new code writes
+-- "code_hash", which the old schema lacks. Apply during the same deploy as the
+-- backend that ships it (the table is low-traffic; a request that races the
+-- swap fails loudly with a column error and can simply be retried).
 
 BEGIN;
 

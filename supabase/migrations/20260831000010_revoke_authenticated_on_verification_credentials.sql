@@ -1,7 +1,7 @@
--- Migration 170: take the verification-credential tables away from the
+-- Migration 194: take the verification-credential tables away from the
 -- `authenticated` role.
 --
--- Migration 160 closed the plaintext half of the mail-code bypass (the code was
+-- Migration 185 closed the plaintext half of the mail-code bypass (the code was
 -- being written into MailVerificationJob.metadata, which the claimant could read
 -- back) but revoked only `anon`. Migration 070 still stands:
 --
@@ -13,14 +13,14 @@
 -- under a second, so possession of the hash is possession of the code, and the
 -- bypass 160 was written to close survives verbatim on the sibling table.
 --
--- Migration 162 introduced the same shape on the legacy path that iOS and
+-- Migration 187 introduced the same shape on the legacy path that iOS and
 -- Android actually use: it replaced HomePostcardCode's cleartext column with a
 -- hash and then re-granted SELECT to `authenticated` under the comment "the hash
 -- is never useful to them". For an unsalted SHA-256 of a six-digit code, it is.
 --
 -- Nothing in the application reads any of these tables as `anon` or
 -- `authenticated`: every access goes through supabaseAdmin (the service role),
--- which is exempt from both grants and RLS. Migration 160's own header says as
+-- which is exempt from both grants and RLS. Migration 185's own header says as
 -- much. The pending-postcard status a user is meant to see is already served
 -- server-side by routes/homeIam.js, which selects only expires_at.
 --

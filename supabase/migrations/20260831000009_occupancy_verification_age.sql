@@ -1,4 +1,4 @@
--- Migration 169: When was this residency actually verified?
+-- Migration 193: When was this residency actually verified?
 --
 -- §5.1 / LIF-04 — `HomeOccupancy.verification_status` is one bit and it is the
 -- only bit. The system had no column recording WHEN a residency was verified,
@@ -9,7 +9,7 @@
 --
 -- This adds the timestamps. It deliberately does NOT change any access
 -- decision: enforcement is gated behind the `address.enforce_verification_expiry`
--- runtime flag (migration 167 / utils/addressRolloutFlags.js), shipped disabled.
+-- runtime flag (utils/addressRolloutFlags.js), shipped disabled.
 -- Expiring the existing verified base is a product decision, not a migration.
 
 BEGIN;
@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS "idx_home_occupancy_verification_age"
 
 COMMENT ON COLUMN "public"."HomeOccupancy"."verified_at" IS
   'When this residency was last verified. Backfilled from start_at for rows '
-  'predating migration 169, so historical values are approximate.';
+  'predating migration 193, so historical values are approximate.';
 
 COMMENT ON COLUMN "public"."HomeOccupancy"."verification_expires_at" IS
   'When this verification should be re-attested. Advisory unless the '

@@ -1,4 +1,4 @@
--- Migration 166: Home.coordinate_validation
+-- Migration 191: Home.coordinate_validation
 --
 -- jobs/validateHomeCoordinates.js reverse-geocodes newly created homes and
 -- compares the result against the stored address, to catch a home whose pin

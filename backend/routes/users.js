@@ -4017,7 +4017,7 @@ router.delete('/account', verifyToken, async (req, res) => {
 
     // LIF-02: block deletion while this user is the owner of a home that other
     // people still live in. Home.owner_id now SET NULLs rather than cascading
-    // (migration 163), so the home itself survives — but a household left with
+    // (migration 188), so the home itself survives — but a household left with
     // no owner has nobody who can manage members, so make it an explicit
     // hand-over rather than a silent one. This mirrors the gig and escrow
     // pre-checks above.

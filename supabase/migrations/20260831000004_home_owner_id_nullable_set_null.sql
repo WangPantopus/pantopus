@@ -1,4 +1,4 @@
--- Migration 163: Home.owner_id — allow NULL, and stop cascading Home deletion
+-- Migration 188: Home.owner_id — allow NULL, and stop cascading Home deletion
 --
 -- Two critical findings from the 2026-08-22 audit share one root cause:
 -- `Home.owner_id` is NOT NULL with ON DELETE CASCADE.

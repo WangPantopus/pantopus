@@ -2651,7 +2651,7 @@ router.post('/:id/verify-postcard', verifyToken, verificationAttemptLimiter, val
     }
 
     // ── TIMING-SAFE COMPARISON ──
-    // Only the SHA-256 hash is stored (migration 162). Hashing normalises the
+    // Only the SHA-256 hash is stored (migration 187). Hashing normalises the
     // length, so the comparison is a plain fixed-width constant-time check.
     const submittedHash = hashPostcardCode(code);
     const storedHash = postcard.code_hash || '';

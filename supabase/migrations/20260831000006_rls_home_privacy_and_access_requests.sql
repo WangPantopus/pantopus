@@ -1,4 +1,4 @@
--- Migration 165: RLS for HomePrivacy and HomeHouseholdAccessRequest
+-- Migration 190: RLS for HomePrivacy and HomeHouseholdAccessRequest
 --
 -- Neither table was created with row level security (migrations 153 and 109),
 -- so both were reachable directly by any role holding a table grant. Between

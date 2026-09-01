@@ -1,4 +1,4 @@
--- Migration 164: Residency letters — expiry, and row level security
+-- Migration 189: Residency letters — expiry, and row level security
 --
 -- A residency letter is a server-attested, publicly-verifiable credential that
 -- is consumed OUTSIDE our trust boundary, by landlords, schools and the DMV. It

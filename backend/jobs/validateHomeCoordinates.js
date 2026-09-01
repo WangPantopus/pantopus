@@ -116,7 +116,7 @@ async function validateHomeCoordinates() {
     // migration, so that branch was taken every single run: the job never
     // validated a home, and an operator reading the registry saw a healthy
     // control. A job that cannot run must fail loudly. The column is added by
-    // migration 166.
+    // migration 191.
     logger.error('[validateCoords] Failed to query homes', { error: error.message });
     return;
   }
