@@ -154,6 +154,10 @@ cp .env.example .env                # Edit with your backend URL + Stripe key
 
 Or open `frontend/apps/android/` in Android Studio and let it sync.
 
+Installing on a **physical phone** — USB debugging, the two host lines in
+`.env`, `adb reverse`, and which Gradle tasks to avoid — is covered in
+[`docs/device-build-runbook.md`](docs/device-build-runbook.md).
+
 ## Common tasks
 
 | Task                              | Command                                                      |
